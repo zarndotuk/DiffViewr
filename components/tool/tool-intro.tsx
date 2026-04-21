@@ -13,10 +13,10 @@ export function ToolIntro({ buttonClass, onLoadSample }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-4">
 
         {/* Description — plain prose, not a heading */}
-        <p className="text-[13px] text-[var(--muted)] leading-relaxed max-w-xl">
-          Paste two configs —{" "}
-          <span className="text-[var(--text)] font-medium">JSON, YAML, or ENV</span>
-          {" "}— and instantly see what changed across environments.
+        <p className="text-[14px] text-[var(--muted)] leading-relaxed max-w-2xl">
+          Paste two files —{" "}
+          <span className="text-[var(--text)] font-medium">your config text</span>
+          {" "}— and instantly see what changed!
         </p>
 
         {/* Try an example — elevated, not hidden */}
@@ -25,16 +25,14 @@ export function ToolIntro({ buttonClass, onLoadSample }: Props) {
   type="button"
   aria-label="Load an example diff"
   title="Load an example diff"
-  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md
-             text-[11px] font-medium tracking-wide uppercase
-             text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)]
-             bg-[color-mix(in_srgb,var(--accent)_6%,transparent)]
-             hover:bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]
-             hover:border-[color-mix(in_srgb,var(--accent)_50%,transparent)]
-             transition-all duration-150 cursor-pointer whitespace-nowrap"
+  className="inline-flex items-center justify-center gap-2 px-5 py-2 text-[12px] font-bold text-white rounded-full
+             bg-gradient-to-r from-indigo-600 to-violet-600 hover:brightness-110
+             shadow-[0_0_25px_-5px_rgba(99,102,241,0.5)] transition-all duration-300
+             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]
+             focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] cursor-pointer whitespace-nowrap"
 >
   <svg
-    width="10" height="10" viewBox="0 0 14 14"
+    width="14" height="14" viewBox="0 0 14 14"
     fill="none" aria-hidden="true"
     className="shrink-0"
   >

@@ -1,6 +1,9 @@
 "use client";
 
-type Validation = { ok: boolean; message: string } | null;
+import { ValidationStatus } from "@/components/tool/validation-status";
+import { FormatBadge } from "@/components/tool/format-badge";
+import { useFormatDetection } from "@/hooks/useFormatDetection";
+import type { ValidationResult } from "@/lib/validateInput";
 
 type Props = {
   panelClass: string;
@@ -14,8 +17,12 @@ type Props = {
   setRefText: (v: string) => void;
   targetText: string;
   setTargetText: (v: string) => void;
-  validationA: Validation;
-  validationB: Validation;
+  validationA: ValidationResult | null;
+  validationB: ValidationResult | null;
+  onJumpToLineA: (lineNumber: number) => void;
+  onJumpToLineB: (lineNumber: number) => void;
+  onPasteA: () => void;
+  onPasteB: () => void;
 };
 
 export function JsonInputGrid({
@@ -31,15 +38,32 @@ export function JsonInputGrid({
   targetText,
   setTargetText,
   validationA,
-  validationB
+  validationB,
+  onJumpToLineA,
+  onJumpToLineB,
+  onPasteA,
+  onPasteB
 }: Props) {
+  const refDetection = useFormatDetection(refText, { debounceMs: 600 });
+  const targetDetection = useFormatDetection(targetText, { debounceMs: 600 });
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <section className={panelClass}>
         <div className="flex items-center justify-between gap-2 mb-2">
-          <label htmlFor="reference-json" className="text-sm text-[var(--muted)] font-semibold">
-            1) Reference JSON (A)
-          </label>
+          <div className="flex min-w-0 items-center gap-2">
+            <label htmlFor="reference-json" className="text-sm text-[var(--muted)] font-semibold">
+              Template (A)
+            </label>
+            <span className={refDetection.isDetecting ? "opacity-70" : undefined}>
+              <FormatBadge format={refDetection.format} />
+            </span>
+            {validationA ? (
+              <span className="min-w-0">
+                <ValidationStatus result={validationA} onJumpToLine={onJumpToLineA} />
+              </span>
+            ) : null}
+          </div>
           {isOutputVisible ? (
             <button
               className={buttonBase}
@@ -54,7 +78,7 @@ export function JsonInputGrid({
 
         {isOutputVisible && inputsCollapsed ? (
           <div className="text-[13px] text-[var(--muted)]">
-            Collapsed. Reference has <strong>{refText.length.toLocaleString()}</strong>{" "}
+            Collapsed. A has <strong>{refText.length.toLocaleString()}</strong>{" "}
             characters.
           </div>
         ) : (
@@ -67,36 +91,46 @@ export function JsonInputGrid({
               className={`${inputClass} ${jsonInputSizeClass}`}
               value={refText}
               onChange={(e) => setRefText(e.target.value)}
-              placeholder='Paste JSON here. Example: {"items":[{"id":"a"},{"id":"b"}]}'
+              onPaste={() => {
+                refDetection.markNextChangeImmediate();
+                onPasteA();
+              }}
+              placeholder="Paste config here…"
               spellCheck={false}
               aria-describedby="reference-help"
-              aria-invalid={validationA ? !validationA.ok : undefined}
+              aria-invalid={validationA ? !validationA.valid : undefined}
+              aria-busy={refDetection.isDetecting || undefined}
             />
-            {validationA ? (
-              <div className="mt-2 text-[13px] text-[var(--muted)]">
-                {validationA.ok ? "Valid JSON." : validationA.message}
-              </div>
-            ) : null}
           </>
         )}
       </section>
 
       <section className={panelClass}>
-        <label
-          htmlFor="target-json"
-          className="text-sm text-[var(--muted)] font-semibold mb-2 block"
-        >
-          2) Target JSON (B)
-        </label>
+        <div className="flex items-center gap-2 mb-2">
+          <label
+            htmlFor="target-json"
+            className="text-sm text-[var(--muted)] font-semibold block"
+          >
+            Target (B)
+          </label>
+          <span className={targetDetection.isDetecting ? "opacity-70" : undefined}>
+            <FormatBadge format={targetDetection.format} />
+          </span>
+          {validationB ? (
+            <span className="min-w-0">
+              <ValidationStatus result={validationB} onJumpToLine={onJumpToLineB} />
+            </span>
+          ) : null}
+        </div>
         {isOutputVisible && inputsCollapsed ? (
           <div className="text-[13px] text-[var(--muted)]">
-            Collapsed. Target has <strong>{targetText.length.toLocaleString()}</strong>{" "}
+            Collapsed. B has <strong>{targetText.length.toLocaleString()}</strong>{" "}
             characters.
           </div>
         ) : (
           <>
             <div id="target-help" className="mb-2 text-[12.5px] text-[var(--muted)]">
-              This JSON is reordered to produce the result. Your data stays in B; only ordering
+              This will be reordered for comparison purpose. Your data stays in B; only ordering
               changes.
             </div>
             <textarea
@@ -104,20 +138,19 @@ export function JsonInputGrid({
               className={`${inputClass} ${jsonInputSizeClass}`}
               value={targetText}
               onChange={(e) => setTargetText(e.target.value)}
-              placeholder='Paste JSON here. Example: {"items":[{"id":"b"},{"id":"a"}]}'
+              onPaste={() => {
+                targetDetection.markNextChangeImmediate();
+                onPasteB();
+              }}
+              placeholder="Paste config here…"
               spellCheck={false}
               aria-describedby="target-help"
-              aria-invalid={validationB ? !validationB.ok : undefined}
+              aria-invalid={validationB ? !validationB.valid : undefined}
+              aria-busy={targetDetection.isDetecting || undefined}
             />
-            {validationB ? (
-              <div className="mt-2 text-[13px] text-[var(--muted)]">
-                {validationB.ok ? "Valid JSON." : validationB.message}
-              </div>
-            ) : null}
           </>
         )}
       </section>
     </div>
   );
 }
-

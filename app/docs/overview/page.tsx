@@ -15,9 +15,9 @@ export default function DocsOverviewPage() {
         <div className="mt-6 rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,var(--panel),var(--panel2))] p-4 shadow-[var(--shadow)]">
           <h2 className="text-sm font-semibold text-[var(--text)]">Quick start</h2>
           <ol className="mt-2 list-decimal pl-5 text-[13px] text-[var(--muted)] space-y-1">
-            <li>Paste Reference JSON (A) on the left.</li>
-            <li>Paste Target JSON (B) on the right.</li>
-            <li>Click “Sort & Compare”.</li>
+            <li>Paste Template (A) on the left.</li>
+            <li>Paste Config (B) on the right.</li>
+            <li>Click “Align & Compare”.</li>
             <li>Copy the reordered result and commit a diff-friendly change.</li>
           </ol>
         </div>
@@ -42,4 +42,3 @@ export default function DocsOverviewPage() {
     </main>
   );
 }
-

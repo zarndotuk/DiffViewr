@@ -13,8 +13,8 @@ export function ToolInfo({ panelClass }: Props) {
       <div className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
         <ul className="list-disc pl-5 space-y-1">
           <li>
-            Reorders <strong>Target JSON (B)</strong> to match the{" "}
-            <strong>ordering</strong> in <strong>Reference JSON (A)</strong> (diff-friendly).
+            Reorders <strong>B</strong> to match the <strong>key order</strong> in{" "}
+            <strong>A</strong> (diff-friendly).
           </li>
           <li>Highlights additions, deletions, and changed values in Visual Compare.</li>
           <li>
@@ -26,4 +26,3 @@ export function ToolInfo({ panelClass }: Props) {
     </details>
   );
 }
-

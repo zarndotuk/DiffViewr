@@ -33,13 +33,13 @@ html[data-theme="light"] {
 
 html[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0b0b17;
-  --panel: #15142a;
-  --panel2: #111225;
+  --bg: #060b2a;
+  --panel: #0a1541;
+  --panel2: #162E93;
   --text: #f2f1ff;
   --muted: #b8b3d6;
-  --border: #2f2b4b;
-  --accent: #8b7bff;
+  --border: #132440;
+  --accent: #A8FBD3;
   --accent-weak: rgba(139, 123, 255, 0.16);
   --danger: #f59e0b;
   --ok: #34d399;
@@ -97,7 +97,7 @@ html[data-theme="dark"] {
   min-width: 200px;
   border-radius: 0;
   border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  background: var(--panel);
   box-shadow: var(--shadow);
   padding: 4px;
 }
@@ -479,7 +479,7 @@ input {
 }
 
 .json-scroll {
-  max-height: 520px;
+  max-height: 70vh;
   overflow: auto;
 }
 
@@ -552,5 +552,25 @@ input {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, 18px, 0);
+  }
+}
+
+.animate-float {
+  animation: float 10s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float {
+    animation: none;
   }
 }

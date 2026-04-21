@@ -357,7 +357,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
         <div className="grid grid-cols-2 gap-3 min-w-[720px]">
           <div className="overflow-hidden">
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
-              Reference JSON (A)
+              Template (A)
             </div>
             <div className="json-view">
               {aligned.map((line, idx) => {
@@ -376,7 +376,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
           </div>
           <div className="overflow-hidden">
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
-              Reordered Target (B)
+              Aligned (B)
             </div>
             <div className="json-view">
               {aligned.map((line, idx) => {

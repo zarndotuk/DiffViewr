@@ -52,7 +52,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_86%,transparent)] backdrop-blur">
-      <div className="mx-auto w-full max-w-6xl px-6 py-1.5 flex items-center justify-between gap-4">
+      <div className="mx-auto w-full max-w-screen px-10 py-1.5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href="/" className="inline-flex items-center gap-2 no-underline">
             <img
