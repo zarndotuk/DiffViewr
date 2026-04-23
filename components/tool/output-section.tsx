@@ -68,7 +68,7 @@ export function OutputSection({
         <>
           <h2 className="text-sm text-[var(--muted)] font-semibold mb-2">4) Visual Compare</h2>
           {compare ? (
-            <VisualComparePanel result={compare} />
+            <VisualComparePanel result={compare} maximized={outputMaximized} />
           ) : (
             <div className="text-[13px] text-[var(--muted)]">
               Run <strong>Align & Compare</strong> to see differences.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CompareResult, DiffNode, DiffKind } from "@/lib/diff/types";
 import { DiffSummaryBar } from "@/components/compare/diff-summary-bar";
 import { DiffLegend } from "@/components/compare/diff-legend";
@@ -65,82 +65,219 @@ type LinePair = {
   bStatus?: DiffKind;
 };
 
+type RenderLine = {
+  text: string;
+  path?: string;
+  depth: number;
+};
+
+function isPrimitive(value: unknown) {
+  return value === null || ["string", "number", "boolean"].includes(typeof value);
+}
+
+function hasOwn(obj: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function indentOf(indentSize: number, depth: number) {
+  return " ".repeat(indentSize * depth);
+}
+
+function replaceBasePath(path: string | undefined, fromBase: string, toBase: string) {
+  if (!path) return path;
+  if (fromBase === toBase) return path;
+  if (path === fromBase) return toBase;
+  if (path.startsWith(fromBase)) return `${toBase}${path.slice(fromBase.length)}`;
+  return path;
+}
+
+function primitiveKey(value: unknown) {
+  if (value === null) return "null";
+  switch (typeof value) {
+    case "string":
+      return `s:${value}`;
+    case "number":
+      return `n:${value}`;
+    case "boolean":
+      return `b:${value}`;
+    default:
+      return `x:${String(value)}`;
+  }
+}
+
+type ArrayOp =
+  | { kind: "both"; aIdx: number; bIdx: number }
+  | { kind: "aOnly"; aIdx: number }
+  | { kind: "bOnly"; bIdx: number };
+
+function alignPrimitiveArrays(a: unknown[], b: unknown[]): ArrayOp[] | null {
+  const n = a.length;
+  const m = b.length;
+  const maxCells = 20000;
+  if (n * m > maxCells) return null;
+
+  const aKeys = a.map(primitiveKey);
+  const bKeys = b.map(primitiveKey);
+
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i -= 1) {
+    for (let j = m - 1; j >= 0; j -= 1) {
+      dp[i][j] =
+        aKeys[i] === bKeys[j]
+          ? 1 + dp[i + 1][j + 1]
+          : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+
+  const ops: ArrayOp[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (aKeys[i] === bKeys[j]) {
+      ops.push({ kind: "both", aIdx: i, bIdx: j });
+      i += 1;
+      j += 1;
+      continue;
+    }
+    if (dp[i + 1][j] >= dp[i][j + 1]) {
+      ops.push({ kind: "aOnly", aIdx: i });
+      i += 1;
+    } else {
+      ops.push({ kind: "bOnly", bIdx: j });
+      j += 1;
+    }
+  }
+  while (i < n) {
+    ops.push({ kind: "aOnly", aIdx: i });
+    i += 1;
+  }
+  while (j < m) {
+    ops.push({ kind: "bOnly", bIdx: j });
+    j += 1;
+  }
+
+  return ops;
+}
+
+type ScrollMetrics = {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+};
+
+function diffKindPriority(kind?: DiffKind) {
+  switch (kind) {
+    case "type_mismatch":
+      return 4;
+    case "changed":
+      return 3;
+    case "missing":
+      return 2;
+    case "extra":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function diffKindColor(kind?: DiffKind) {
+  switch (kind) {
+    case "missing":
+      return "var(--danger)";
+    case "extra":
+      return "var(--ok)";
+    case "changed":
+      return "var(--accent)";
+    case "type_mismatch":
+      return "color-mix(in srgb, var(--danger) 85%, var(--accent))";
+    default:
+      return "transparent";
+  }
+}
+
+function mergeKind(a?: DiffKind, b?: DiffKind) {
+  return diffKindPriority(a) >= diffKindPriority(b) ? a : b;
+}
+
 function renderSingle(
   value: unknown,
   path: string,
   depth: number,
   indentSize: number,
   wrap = true
-): { text: string; path?: string }[] {
-  const indent = " ".repeat(indentSize * depth);
+): RenderLine[] {
+  const indent = indentOf(indentSize, depth);
   if (Array.isArray(value)) {
-    const lines: { text: string; path?: string }[] = wrap
-      ? [{ text: `${indent}[`, path }]
+    const lines: RenderLine[] = wrap
+      ? [{ text: `${indent}[`, path, depth }]
       : [];
     value.forEach((item, index) => {
       const itemPath = `${path}[${index}]`;
-      const isPrimitive = item === null || ["string", "number", "boolean"].includes(typeof item);
-      if (isPrimitive) {
+      if (isPrimitive(item)) {
         lines.push({
-          text: `${" ".repeat(indentSize * (depth + 1))}${formatValue(item)}${
+          text: `${indentOf(indentSize, depth + 1)}${formatValue(item)}${
             index < value.length - 1 ? "," : ""
           }`,
-          path: itemPath
+          path: itemPath,
+          depth: depth + 1
         });
       } else {
         const child = renderSingle(item, itemPath, depth + 1, indentSize, true);
         const last = child.length - 1;
         child[last] = {
           text: `${child[last].text}${index < value.length - 1 ? "," : ""}`,
-          path: child[last].path
+          path: child[last].path,
+          depth: child[last].depth
         };
         lines.push(...child);
       }
     });
-    if (wrap) lines.push({ text: `${indent}]`, path });
+    if (wrap) lines.push({ text: `${indent}]`, path, depth });
     return lines;
   }
   if (value && typeof value === "object") {
-    const lines: { text: string; path?: string }[] = wrap
-      ? [{ text: `${indent}{`, path }]
+    const lines: RenderLine[] = wrap
+      ? [{ text: `${indent}{`, path, depth }]
       : [];
     const keys = Object.keys(value as Record<string, unknown>);
     keys.forEach((k, idx) => {
       const childPath = path === "$" ? `$.${k}` : `${path}.${k}`;
       const v = (value as Record<string, unknown>)[k];
-      const isPrimitive = v === null || ["string", "number", "boolean"].includes(typeof v);
-      if (isPrimitive) {
+      if (isPrimitive(v)) {
         lines.push({
-          text: `${" ".repeat(indentSize * (depth + 1))}"${k}": ${formatValue(v)}${
+          text: `${indentOf(indentSize, depth + 1)}"${k}": ${formatValue(v)}${
             idx < keys.length - 1 ? "," : ""
           }`,
-          path: childPath
+          path: childPath,
+          depth: depth + 1
         });
       } else {
-        const open = `${" ".repeat(indentSize * (depth + 1))}"${k}": ${
+        const open = `${indentOf(indentSize, depth + 1)}"${k}": ${
           Array.isArray(v) ? "[" : "{"
         }`;
-        lines.push({ text: open, path: childPath });
+        lines.push({ text: open, path: childPath, depth: depth + 1 });
         const child = renderSingle(v, childPath, depth + 2, indentSize, true);
         lines.push(...child);
         lines.push({
-          text: `${" ".repeat(indentSize * (depth + 1))}${
+          text: `${indentOf(indentSize, depth + 1)}${
             Array.isArray(v) ? "]" : "}"
           }${idx < keys.length - 1 ? "," : ""}`,
-          path: childPath
+          path: childPath,
+          depth: depth + 1
         });
       }
     });
-    if (wrap) lines.push({ text: `${indent}}`, path });
+    if (wrap) lines.push({ text: `${indent}}`, path, depth });
     return lines;
   }
-  return [{ text: `${indent}${formatValue(value)}`, path }];
+  return [{ text: `${indent}${formatValue(value)}`, path, depth }];
 }
 
 function renderAligned(
   aValue: unknown,
   bValue: unknown,
-  path: string,
+  aPathBase: string,
+  bPathBase: string,
   depth: number,
   lines: LinePair[],
   aIndent: number,
@@ -156,25 +293,27 @@ function renderAligned(
   const bIsObj = bValue && typeof bValue === "object" && !Array.isArray(bValue);
 
   if (aExists && !bExists) {
-    const aLines = renderSingle(aValue, path, depth, aIndent, wrap);
+    const aLines = renderSingle(aValue, aPathBase, depth, aIndent, wrap);
     aLines.forEach((l) => {
-      const indent = l.text.match(/^(\s*)/)?.[1] ?? "";
+      const bPath = replaceBasePath(l.path, aPathBase, bPathBase);
       lines.push({
         aText: l.text,
-        bText: `${indent}`,
+        bText: indentOf(bIndent, l.depth),
         aPath: l.path,
+        bPath,
         bStatus: "missing"
       });
     });
     return;
   }
   if (!aExists && bExists) {
-    const bLines = renderSingle(bValue, path, depth, bIndent, wrap);
+    const bLines = renderSingle(bValue, bPathBase, depth, bIndent, wrap);
     bLines.forEach((l) => {
-      const indent = l.text.match(/^(\s*)/)?.[1] ?? "";
+      const aPath = replaceBasePath(l.path, bPathBase, aPathBase);
       lines.push({
-        aText: `${indent}`,
+        aText: indentOf(aIndent, l.depth),
         bText: l.text,
+        aPath,
         bPath: l.path,
         aStatus: "missing",
         bStatus: "extra"
@@ -184,30 +323,78 @@ function renderAligned(
   }
 
   if (aIsArr && bIsArr) {
-    const indentA = " ".repeat(aIndent * depth);
-    const indentB = " ".repeat(bIndent * depth);
+    const indentA = indentOf(aIndent, depth);
+    const indentB = indentOf(bIndent, depth);
     if (wrap) {
       lines.push({
         aText: `${indentA}[`,
         bText: `${indentB}[`,
-        aPath: path,
-        bPath: path
+        aPath: aPathBase,
+        bPath: bPathBase
       });
     }
-    const maxLen = Math.max((aValue as unknown[]).length, (bValue as unknown[]).length);
-    for (let i = 0; i < maxLen; i += 1) {
-      const aItem = (aValue as unknown[])[i];
-      const bItem = (bValue as unknown[])[i];
-      const itemPath = `${path}[${i}]`;
-      const before = lines.length;
-      renderAligned(aItem, bItem, itemPath, depth + 1, lines, aIndent, bIndent, true);
-      const lastIdx = lines.length - 1;
-      if (lines.length > before) {
-        if (aItem !== undefined && i < (aValue as unknown[]).length - 1) {
-          lines[lastIdx].aText = `${lines[lastIdx].aText},`;
+
+    const aArr = aValue as unknown[];
+    const bArr = bValue as unknown[];
+    const aPrim = aArr.every(isPrimitive);
+    const bPrim = bArr.every(isPrimitive);
+    const alignedOps = aPrim && bPrim ? alignPrimitiveArrays(aArr, bArr) : null;
+
+    if (alignedOps) {
+      let visualIndex = 0;
+      for (const op of alignedOps) {
+        const before = lines.length;
+        if (op.kind === "both") {
+          const aItem = aArr[op.aIdx];
+          const bItem = bArr[op.bIdx];
+          const aItemPath = `${aPathBase}[${op.aIdx}]`;
+          const bItemPath = `${bPathBase}[${op.bIdx}]`;
+          renderAligned(aItem, bItem, aItemPath, bItemPath, depth + 1, lines, aIndent, bIndent, true);
+          const lastIdx = lines.length - 1;
+          if (lines.length > before) {
+            if (op.aIdx < aArr.length - 1) lines[lastIdx].aText = `${lines[lastIdx].aText},`;
+            if (op.bIdx < bArr.length - 1) lines[lastIdx].bText = `${lines[lastIdx].bText},`;
+          }
+          visualIndex += 1;
+          continue;
         }
-        if (bItem !== undefined && i < (bValue as unknown[]).length - 1) {
+
+        if (op.kind === "aOnly") {
+          const aItem = aArr[op.aIdx];
+          const aItemPath = `${aPathBase}[${op.aIdx}]`;
+          const bItemPath = `${bPathBase}[${visualIndex}]`;
+          renderAligned(aItem, undefined, aItemPath, bItemPath, depth + 1, lines, aIndent, bIndent, true);
+          const lastIdx = lines.length - 1;
+          if (lines.length > before && op.aIdx < aArr.length - 1) {
+            lines[lastIdx].aText = `${lines[lastIdx].aText},`;
+          }
+          visualIndex += 1;
+          continue;
+        }
+
+        const bItem = bArr[op.bIdx];
+        const aItemPath = `${aPathBase}[${visualIndex}]`;
+        const bItemPath = `${bPathBase}[${op.bIdx}]`;
+        renderAligned(undefined, bItem, aItemPath, bItemPath, depth + 1, lines, aIndent, bIndent, true);
+        const lastIdx = lines.length - 1;
+        if (lines.length > before && op.bIdx < bArr.length - 1) {
           lines[lastIdx].bText = `${lines[lastIdx].bText},`;
+        }
+        visualIndex += 1;
+      }
+    } else {
+      const maxLen = Math.max(aArr.length, bArr.length);
+      for (let i = 0; i < maxLen; i += 1) {
+        const aItem = aArr[i];
+        const bItem = bArr[i];
+        const aItemPath = `${aPathBase}[${i}]`;
+        const bItemPath = `${bPathBase}[${i}]`;
+        const before = lines.length;
+        renderAligned(aItem, bItem, aItemPath, bItemPath, depth + 1, lines, aIndent, bIndent, true);
+        const lastIdx = lines.length - 1;
+        if (lines.length > before) {
+          if (aItem !== undefined && i < aArr.length - 1) lines[lastIdx].aText = `${lines[lastIdx].aText},`;
+          if (bItem !== undefined && i < bArr.length - 1) lines[lastIdx].bText = `${lines[lastIdx].bText},`;
         }
       }
     }
@@ -215,120 +402,345 @@ function renderAligned(
       lines.push({
         aText: `${indentA}]`,
         bText: `${indentB}]`,
-        aPath: path,
-        bPath: path
+        aPath: aPathBase,
+        bPath: bPathBase
       });
     }
     return;
   }
 
   if (aIsObj && bIsObj) {
-    const indentA = " ".repeat(aIndent * depth);
-    const indentB = " ".repeat(bIndent * depth);
+    const indentA = indentOf(aIndent, depth);
+    const indentB = indentOf(bIndent, depth);
     if (wrap) {
       lines.push({
         aText: `${indentA}{`,
         bText: `${indentB}{`,
-        aPath: path,
-        bPath: path
+        aPath: aPathBase,
+        bPath: bPathBase
       });
     }
     const aObj = aValue as Record<string, unknown>;
     const bObj = bValue as Record<string, unknown>;
     const keys = [...Object.keys(aObj), ...Object.keys(bObj).filter((k) => !(k in aObj))];
+
+    function renderPropertySingle(
+      value: unknown,
+      key: string,
+      childPath: string,
+      parentDepth: number,
+      indentSize: number
+    ): RenderLine[] {
+      const propDepth = parentDepth + 1;
+      const propIndent = indentOf(indentSize, propDepth);
+
+      if (isPrimitive(value)) {
+        return [
+          {
+            text: `${propIndent}"${key}": ${formatValue(value)}`,
+            path: childPath,
+            depth: propDepth
+          }
+        ];
+      }
+
+      const isArr = Array.isArray(value);
+      const openChar = isArr ? "[" : "{";
+      const closeChar = isArr ? "]" : "}";
+
+      const open: RenderLine = {
+        text: `${propIndent}"${key}": ${openChar}`,
+        path: childPath,
+        depth: propDepth
+      };
+      const inner = renderSingle(value, childPath, propDepth, indentSize, false);
+      const close: RenderLine = {
+        text: `${propIndent}${closeChar}`,
+        path: childPath,
+        depth: propDepth
+      };
+      return [open, ...inner, close];
+    }
+
     keys.forEach((k, idx) => {
-      const childPath = path === "$" ? `$.${k}` : `${path}.${k}`;
-      const aChild = aObj[k];
-      const bChild = bObj[k];
-      const aPrim = aChild === null || ["string", "number", "boolean"].includes(typeof aChild);
-      const bPrim = bChild === null || ["string", "number", "boolean"].includes(typeof bChild);
-      if (aPrim && bPrim) {
+      const aChildPath = aPathBase === "$" ? `$.${k}` : `${aPathBase}.${k}`;
+      const bChildPath = bPathBase === "$" ? `$.${k}` : `${bPathBase}.${k}`;
+      const aHas = hasOwn(aObj, k);
+      const bHas = hasOwn(bObj, k);
+      const comma = idx < keys.length - 1;
+      const aChild = aHas ? aObj[k] : undefined;
+      const bChild = bHas ? bObj[k] : undefined;
+
+      if (aHas && bHas) {
+        const aPrim = isPrimitive(aChild);
+        const bPrim = isPrimitive(bChild);
+        if (aPrim && bPrim) {
+          lines.push({
+            aText: `${indentOf(aIndent, depth + 1)}"${k}": ${formatValue(aChild)}${comma ? "," : ""}`,
+            bText: `${indentOf(bIndent, depth + 1)}"${k}": ${formatValue(bChild)}${comma ? "," : ""}`,
+            aPath: aChildPath,
+            bPath: bChildPath
+          });
+          return;
+        }
+
+        if (!aPrim && !bPrim && Array.isArray(aChild) === Array.isArray(bChild)) {
+          lines.push({
+            aText: `${indentOf(aIndent, depth + 1)}"${k}": ${Array.isArray(aChild) ? "[" : "{"}`,
+            bText: `${indentOf(bIndent, depth + 1)}"${k}": ${Array.isArray(bChild) ? "[" : "{"}`,
+            aPath: aChildPath,
+            bPath: bChildPath
+          });
+          renderAligned(aChild, bChild, aChildPath, bChildPath, depth + 1, lines, aIndent, bIndent, false);
+          lines.push({
+            aText: `${indentOf(aIndent, depth + 1)}${Array.isArray(aChild) ? "]" : "}"}${comma ? "," : ""}`,
+            bText: `${indentOf(bIndent, depth + 1)}${Array.isArray(bChild) ? "]" : "}"}${comma ? "," : ""}`,
+            aPath: aChildPath,
+            bPath: bChildPath
+          });
+          return;
+        }
+
+        const aRendered = renderPropertySingle(aChild, k, aChildPath, depth, aIndent);
+        const bRendered = renderPropertySingle(bChild, k, bChildPath, depth, bIndent);
+        if (comma) {
+          aRendered[aRendered.length - 1].text = `${aRendered[aRendered.length - 1].text},`;
+          bRendered[bRendered.length - 1].text = `${bRendered[bRendered.length - 1].text},`;
+        }
+        const maxLen = Math.max(aRendered.length, bRendered.length);
+        for (let i = 0; i < maxLen; i += 1) {
+          const aLine = aRendered[i];
+          const bLine = bRendered[i];
+          const fallbackDepth = depth + 1;
+          const aDepth = aLine?.depth ?? bLine?.depth ?? fallbackDepth;
+          const bDepth = bLine?.depth ?? aLine?.depth ?? fallbackDepth;
+          lines.push({
+            aText: aLine ? aLine.text : indentOf(aIndent, aDepth),
+            bText: bLine ? bLine.text : indentOf(bIndent, bDepth),
+            aPath: aLine?.path ?? aChildPath,
+            bPath: bLine?.path ?? bChildPath
+          });
+        }
+        return;
+      }
+
+      if (aHas && !bHas) {
+        if (isPrimitive(aChild)) {
+          lines.push({
+            aText: `${indentOf(aIndent, depth + 1)}"${k}": ${formatValue(aChild)}${comma ? "," : ""}`,
+            bText: indentOf(bIndent, depth + 1),
+            aPath: aChildPath,
+            bPath: bChildPath,
+            bStatus: "missing"
+          });
+          return;
+        }
+
         lines.push({
-          aText: `${" ".repeat(aIndent * (depth + 1))}"${k}": ${formatValue(aChild)}${
-            idx < keys.length - 1 ? "," : ""
-          }`,
-          bText: `${" ".repeat(bIndent * (depth + 1))}"${k}": ${formatValue(bChild)}${
-            idx < keys.length - 1 ? "," : ""
-          }`,
-          aPath: childPath,
-          bPath: childPath
+          aText: `${indentOf(aIndent, depth + 1)}"${k}": ${Array.isArray(aChild) ? "[" : "{"}`,
+          bText: indentOf(bIndent, depth + 1),
+          aPath: aChildPath,
+          bPath: bChildPath,
+          bStatus: "missing"
         });
-      } else {
-        const openA =
-          aChild !== undefined
-            ? `${" ".repeat(aIndent * (depth + 1))}"${k}": ${Array.isArray(aChild) ? "[" : "{"}`
-            : "";
-        const openB =
-          bChild !== undefined
-            ? `${" ".repeat(bIndent * (depth + 1))}"${k}": ${Array.isArray(bChild) ? "[" : "{"}`
-            : "";
-        if (openA || openB) {
-          const aStatus = aChild === undefined ? "missing" : undefined;
-          const bStatus = bChild === undefined ? "missing" : aChild === undefined ? "extra" : undefined;
+        renderAligned(aChild, undefined, aChildPath, bChildPath, depth + 1, lines, aIndent, bIndent, false);
+        lines.push({
+          aText: `${indentOf(aIndent, depth + 1)}${Array.isArray(aChild) ? "]" : "}"}${comma ? "," : ""}`,
+          bText: indentOf(bIndent, depth + 1),
+          aPath: aChildPath,
+          bPath: bChildPath,
+          bStatus: "missing"
+        });
+        return;
+      }
+
+      if (!aHas && bHas) {
+        if (isPrimitive(bChild)) {
           lines.push({
-            aText: openA,
-            bText: openB,
-            aPath: childPath,
-            bPath: childPath,
-            aStatus,
-            bStatus
+            aText: indentOf(aIndent, depth + 1),
+            bText: `${indentOf(bIndent, depth + 1)}"${k}": ${formatValue(bChild)}${comma ? "," : ""}`,
+            aPath: aChildPath,
+            bPath: bChildPath,
+            aStatus: "missing",
+            bStatus: "extra"
           });
+          return;
         }
-        renderAligned(aChild, bChild, childPath, depth + 2, lines, aIndent, bIndent, false);
-        const closeA =
-          aChild !== undefined
-            ? `${" ".repeat(aIndent * (depth + 1))}${Array.isArray(aChild) ? "]" : "}"}${
-                idx < keys.length - 1 ? "," : ""
-              }`
-            : "";
-        const closeB =
-          bChild !== undefined
-            ? `${" ".repeat(bIndent * (depth + 1))}${Array.isArray(bChild) ? "]" : "}"}${
-                idx < keys.length - 1 ? "," : ""
-              }`
-            : "";
-        if (closeA || closeB) {
-          const aStatus = aChild === undefined ? "missing" : undefined;
-          const bStatus = bChild === undefined ? "missing" : aChild === undefined ? "extra" : undefined;
-          lines.push({
-            aText: closeA,
-            bText: closeB,
-            aPath: childPath,
-            bPath: childPath,
-            aStatus,
-            bStatus
-          });
-        }
+
+        lines.push({
+          aText: indentOf(aIndent, depth + 1),
+          bText: `${indentOf(bIndent, depth + 1)}"${k}": ${Array.isArray(bChild) ? "[" : "{"}`,
+          aPath: aChildPath,
+          bPath: bChildPath,
+          aStatus: "missing",
+          bStatus: "extra"
+        });
+        renderAligned(undefined, bChild, aChildPath, bChildPath, depth + 1, lines, aIndent, bIndent, false);
+        lines.push({
+          aText: indentOf(aIndent, depth + 1),
+          bText: `${indentOf(bIndent, depth + 1)}${Array.isArray(bChild) ? "]" : "}"}${comma ? "," : ""}`,
+          aPath: aChildPath,
+          bPath: bChildPath,
+          aStatus: "missing",
+          bStatus: "extra"
+        });
       }
     });
     if (wrap) {
       lines.push({
         aText: `${indentA}}`,
         bText: `${indentB}}`,
-        aPath: path,
-        bPath: path
+        aPath: aPathBase,
+        bPath: bPathBase
       });
     }
     return;
   }
 
-  const indentA = " ".repeat(aIndent * depth);
-  const indentB = " ".repeat(bIndent * depth);
+  const indentA = indentOf(aIndent, depth);
+  const indentB = indentOf(bIndent, depth);
   lines.push({
     aText: `${indentA}${formatValue(aValue)}`,
     bText: `${indentB}${formatValue(bValue)}`,
-    aPath: path,
-    bPath: path
+    aPath: aPathBase,
+    bPath: bPathBase
   });
 }
 
-export function VisualComparePanel({ result }: { result: CompareResult }) {
+export function VisualComparePanel({ result, maximized = false }: { result: CompareResult; maximized?: boolean }) {
   const { aMap, bMap } = useMemo(() => buildKindMaps(result.root), [result.root]);
   const aligned = useMemo(() => {
     const lines: LinePair[] = [];
-    renderAligned(result.aRoot, result.bRoot, "$", 0, lines, result.aIndent, result.bIndent);
+    renderAligned(result.aRoot, result.bRoot, "$", "$", 0, lines, result.aIndent, result.bIndent);
     return lines;
   }, [result.aRoot, result.bRoot, result.aIndent, result.bIndent]);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [metrics, setMetrics] = useState<ScrollMetrics>({ scrollTop: 0, scrollHeight: 1, clientHeight: 1 });
+
+  const inferAForLine = (line: LinePair) =>
+    (line.aStatus ? line.aStatus : line.aPath ? aMap.get(line.aPath) : undefined) as DiffKind | undefined;
+  const inferBForLine = (line: LinePair) =>
+    (line.bStatus ? line.bStatus : line.bPath ? bMap.get(line.bPath) : undefined) as DiffKind | undefined;
+
+  const inferBetweenKind = (line: LinePair): DiffKind | undefined => {
+    if (line.bStatus === "missing") return "missing";
+    if (line.bStatus === "extra") return "extra";
+    if (line.aStatus === "missing") return "missing";
+    return mergeKind(inferAForLine(line), inferBForLine(line));
+  };
+
+  useEffect(() => {
+    if (!maximized) return;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      setMetrics({
+        scrollTop: el.scrollTop,
+        scrollHeight: el.scrollHeight || 1,
+        clientHeight: el.clientHeight || 1
+      });
+    };
+
+    const onScroll = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(update);
+    };
+
+    update();
+    el.addEventListener("scroll", onScroll, { passive: true });
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+      el.removeEventListener("scroll", onScroll);
+      ro.disconnect();
+    };
+  }, [maximized]);
+
+  const gutter = useMemo(() => {
+    if (!maximized) return null;
+    return (
+      <div
+        className="py-[10px] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)]"
+        style={{ fontFamily: "var(--mono)", fontSize: 12, lineHeight: 1.6 }}
+      >
+        {aligned.map((line, idx) => {
+          const kind = inferBetweenKind(line);
+          const color = diffKindColor(kind);
+          return (
+            <div key={`g-${idx}`} className="relative py-[2px]">
+              <span className="whitespace-pre text-transparent select-none">.</span>
+              {color !== "transparent" ? (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 top-[2px] bottom-[2px] w-[6px] rounded-md"
+                  style={{ background: color }}
+                  aria-hidden="true"
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }, [aligned, maximized, aMap, bMap]);
+
+  const scrollbar = useMemo(() => {
+    if (!maximized) return null;
+    const clientHeight = metrics.clientHeight || 1;
+    const totalLines = Math.max(1, aligned.length);
+
+    const bucketCount = Math.min(260, Math.max(24, Math.floor(clientHeight / 2)));
+    const buckets: { a?: DiffKind; b?: DiffKind }[] = Array.from({ length: bucketCount }, () => ({}));
+
+    for (let i = 0; i < aligned.length; i += 1) {
+      const bucket = Math.min(bucketCount - 1, Math.floor((i / totalLines) * bucketCount));
+      const aKind = inferAForLine(aligned[i]);
+      const bKind = inferBForLine(aligned[i]);
+      if (diffKindPriority(aKind) > diffKindPriority(buckets[bucket].a)) buckets[bucket].a = aKind;
+      if (diffKindPriority(bKind) > diffKindPriority(buckets[bucket].b)) buckets[bucket].b = bKind;
+    }
+
+    const viewportTop = (metrics.scrollTop / (metrics.scrollHeight || 1)) * clientHeight;
+    const viewportHeight = (clientHeight / (metrics.scrollHeight || 1)) * clientHeight;
+
+    return (
+      <div className="relative w-[14px]">
+        <div className="sticky top-0 h-full">
+          <div className="relative h-full rounded-md border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_65%,transparent)] overflow-hidden">
+            {buckets.map((b, i) => {
+              const top = Math.round((i / bucketCount) * clientHeight);
+              const height = Math.max(1, Math.round(clientHeight / bucketCount));
+              const aColor = diffKindColor(b.a);
+              const bColor = diffKindColor(b.b);
+              if (aColor === "transparent" && bColor === "transparent") return null;
+              return (
+                <div key={i} className="absolute left-0 right-0" style={{ top, height }}>
+                  <div className="flex h-full">
+                    <div className="w-1/2 h-full" style={{ background: aColor }} />
+                    <div className="w-1/2 h-full" style={{ background: bColor }} />
+                  </div>
+                </div>
+              );
+            })}
+            <div
+              className="absolute left-0 right-0 rounded-sm border border-[color-mix(in_srgb,var(--accent)_55%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]"
+              style={{
+                top: Math.max(0, Math.min(clientHeight - 2, viewportTop)),
+                height: Math.max(8, Math.min(clientHeight, viewportHeight))
+              }}
+              aria-hidden="true"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }, [maximized, metrics, aligned, aMap, bMap]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -353,9 +765,9 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
       </div>
       <DiffSummaryBar summary={result.summary} />
       <DiffLegend />
-      <div className="json-scroll rounded-xl border border-[var(--border)]">
-        <div className="grid grid-cols-2 gap-3 min-w-[720px]">
-          <div className="overflow-hidden">
+      <div ref={scrollRef} className="json-scroll rounded-xl border border-[var(--border)] relative">
+        <div className={maximized ? "flex gap-3 min-w-[760px]" : "grid grid-cols-2 gap-3 min-w-[720px]"}>
+          <div className={maximized ? "flex-1 min-w-0 overflow-hidden" : "overflow-hidden"}>
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
               Template (A)
             </div>
@@ -374,7 +786,23 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
               })}
             </div>
           </div>
-          <div className="overflow-hidden">
+          {maximized ? (
+            <>
+              <div className="flex-none w-[10px] overflow-hidden">
+                <div className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]" aria-hidden="true">
+                  &nbsp;
+                </div>
+                {gutter}
+              </div>
+              <div className="flex-none w-[14px] overflow-hidden">
+                <div className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]" aria-hidden="true">
+                  &nbsp;
+                </div>
+                <div className="py-[10px] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)]">{scrollbar}</div>
+              </div>
+            </>
+          ) : null}
+          <div className={maximized ? "flex-1 min-w-0 overflow-hidden" : "overflow-hidden"}>
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
               Aligned (B)
             </div>
