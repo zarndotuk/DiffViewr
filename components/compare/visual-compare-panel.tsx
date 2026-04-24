@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CompareResult, DiffNode, DiffKind } from "@/lib/diff/types";
+import { shikiTokenizeLinesForMode, type ShikiTokenLine } from "@/lib/shiki/getHighlighter";
 import { DiffSummaryBar } from "@/components/compare/diff-summary-bar";
 import { DiffLegend } from "@/components/compare/diff-legend";
 
@@ -164,6 +165,8 @@ type ScrollMetrics = {
   scrollHeight: number;
   clientHeight: number;
 };
+
+type ResolvedTheme = "light" | "dark";
 
 function diffKindPriority(kind?: DiffKind) {
   switch (kind) {
@@ -607,7 +610,7 @@ function renderAligned(
   });
 }
 
-export function VisualComparePanel({ result, maximized = false }: { result: CompareResult; maximized?: boolean }) {
+export function VisualComparePanel({ result }: { result: CompareResult }) {
   const { aMap, bMap } = useMemo(() => buildKindMaps(result.root), [result.root]);
   const aligned = useMemo(() => {
     const lines: LinePair[] = [];
@@ -618,20 +621,124 @@ export function VisualComparePanel({ result, maximized = false }: { result: Comp
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [metrics, setMetrics] = useState<ScrollMetrics>({ scrollTop: 0, scrollHeight: 1, clientHeight: 1 });
 
-  const inferAForLine = (line: LinePair) =>
-    (line.aStatus ? line.aStatus : line.aPath ? aMap.get(line.aPath) : undefined) as DiffKind | undefined;
-  const inferBForLine = (line: LinePair) =>
-    (line.bStatus ? line.bStatus : line.bPath ? bMap.get(line.bPath) : undefined) as DiffKind | undefined;
+  const inferAForLine = useCallback(
+    (line: LinePair) =>
+      (line.aStatus ? line.aStatus : line.aPath ? aMap.get(line.aPath) : undefined) as DiffKind | undefined,
+    [aMap]
+  );
+  const inferBForLine = useCallback(
+    (line: LinePair) =>
+      (line.bStatus ? line.bStatus : line.bPath ? bMap.get(line.bPath) : undefined) as DiffKind | undefined,
+    [bMap]
+  );
 
-  const inferBetweenKind = (line: LinePair): DiffKind | undefined => {
-    if (line.bStatus === "missing") return "missing";
-    if (line.bStatus === "extra") return "extra";
-    if (line.aStatus === "missing") return "missing";
-    return mergeKind(inferAForLine(line), inferBForLine(line));
-  };
+  const inferBetweenKind = useCallback(
+    (line: LinePair): DiffKind | undefined => {
+      if (line.bStatus === "missing") return "missing";
+      if (line.bStatus === "extra") return "extra";
+      if (line.aStatus === "missing") return "missing";
+      return mergeKind(inferAForLine(line), inferBForLine(line));
+    },
+    [inferAForLine, inferBForLine]
+  );
+
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("dark");
 
   useEffect(() => {
-    if (!maximized) return;
+    if (typeof document === "undefined") return;
+
+    const read = () => {
+      const t = document.documentElement.getAttribute("data-theme");
+      setResolvedTheme(t === "light" ? "light" : "dark");
+    };
+
+    read();
+    const mo = new MutationObserver(() => read());
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => mo.disconnect();
+  }, []);
+
+  const aCode = useMemo(() => aligned.map((l) => l.aText).join("\n"), [aligned]);
+  const bCode = useMemo(() => aligned.map((l) => l.bText).join("\n"), [aligned]);
+
+  const shouldHighlight = useMemo(() => {
+    const totalChars = aCode.length + bCode.length;
+    return aligned.length <= 3000 && totalChars <= 600_000;
+  }, [aligned.length, aCode, bCode]);
+
+  const [aTokens, setATokens] = useState<ShikiTokenLine[] | null>(null);
+  const [bTokens, setBTokens] = useState<ShikiTokenLine[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setATokens(null);
+    setBTokens(null);
+    if (!shouldHighlight) return () => {
+      cancelled = true;
+    };
+
+    (async () => {
+      try {
+        const [nextA, nextB] = await Promise.all([
+          shikiTokenizeLinesForMode({ code: aCode, mode: resolvedTheme }),
+          shikiTokenizeLinesForMode({ code: bCode, mode: resolvedTheme })
+        ]);
+        if (cancelled) return;
+        setATokens(nextA);
+        setBTokens(nextB);
+      } catch {
+        // Best-effort highlighting only.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [aCode, bCode, shouldHighlight, resolvedTheme]);
+
+  const changeLineIndices = useMemo(() => {
+    const out: number[] = [];
+    for (let i = 0; i < aligned.length; i += 1) {
+      const kind = inferBetweenKind(aligned[i]);
+      if (kind && kind !== "same") out.push(i);
+    }
+    return out;
+  }, [aligned, inferBetweenKind]);
+
+  const [activeChangePos, setActiveChangePos] = useState<number>(0);
+  useEffect(() => {
+    setActiveChangePos(0);
+  }, [changeLineIndices.length]);
+
+  useEffect(() => {
+    if (activeChangePos < changeLineIndices.length) return;
+    setActiveChangePos(Math.max(0, changeLineIndices.length - 1));
+  }, [activeChangePos, changeLineIndices.length]);
+
+  const activeLine = changeLineIndices.length
+    ? changeLineIndices[Math.min(activeChangePos, changeLineIndices.length - 1)]
+    : null;
+
+  const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
+
+  function scrollToLine(lineIndex: number) {
+    const el = scrollRef.current;
+    const row = rowRefs.current[lineIndex];
+    if (!el || !row) return;
+    const y =
+      row.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - el.clientHeight / 3;
+    el.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+  }
+
+  function goToChange(nextPos: number) {
+    if (changeLineIndices.length === 0) return;
+    const clamped = Math.max(0, Math.min(changeLineIndices.length - 1, nextPos));
+    setActiveChangePos(clamped);
+    const lineIndex = changeLineIndices[clamped];
+    if (typeof lineIndex === "number") scrollToLine(lineIndex);
+  }
+
+  useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
@@ -661,10 +768,9 @@ export function VisualComparePanel({ result, maximized = false }: { result: Comp
       el.removeEventListener("scroll", onScroll);
       ro.disconnect();
     };
-  }, [maximized]);
+  }, []);
 
   const gutter = useMemo(() => {
-    if (!maximized) return null;
     return (
       <div
         className="py-[10px] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)]"
@@ -688,10 +794,9 @@ export function VisualComparePanel({ result, maximized = false }: { result: Comp
         })}
       </div>
     );
-  }, [aligned, maximized, aMap, bMap]);
+  }, [aligned, inferBetweenKind]);
 
   const scrollbar = useMemo(() => {
-    if (!maximized) return null;
     const clientHeight = metrics.clientHeight || 1;
     const totalLines = Math.max(1, aligned.length);
 
@@ -740,7 +845,23 @@ export function VisualComparePanel({ result, maximized = false }: { result: Comp
         </div>
       </div>
     );
-  }, [maximized, metrics, aligned, aMap, bMap]);
+  }, [metrics, aligned, inferAForLine, inferBForLine]);
+
+  const buttonBase =
+    "px-3 py-2 rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)] text-sm hover:border-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] disabled:opacity-60 disabled:cursor-not-allowed";
+
+  function renderTokenLine(tokens: ShikiTokenLine | undefined, fallbackText: string) {
+    if (!tokens) return <span className="json-code whitespace-pre">{fallbackText}</span>;
+    return (
+      <span className="json-code">
+        {tokens.map((t, i) => (
+          <span key={i} style={t.color ? { color: t.color } : undefined}>
+            {t.content}
+          </span>
+        ))}
+      </span>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -765,9 +886,45 @@ export function VisualComparePanel({ result, maximized = false }: { result: Comp
       </div>
       <DiffSummaryBar summary={result.summary} />
       <DiffLegend />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[12px] text-[var(--muted)]">
+          {changeLineIndices.length ? (
+            <span>
+              Change {activeChangePos + 1} / {changeLineIndices.length}
+            </span>
+          ) : (
+            <span>No differences</span>
+          )}
+          {!shouldHighlight ? (
+            <span className="ml-2 opacity-80">(syntax highlighting disabled for large inputs)</span>
+          ) : aTokens && bTokens ? (
+            <span className="ml-2 opacity-80">(syntax highlighting: on)</span>
+          ) : (
+            <span className="ml-2 opacity-80">(loading syntax highlighting…)</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className={buttonBase}
+            onClick={() => goToChange(activeChangePos - 1)}
+            type="button"
+            disabled={changeLineIndices.length === 0 || activeChangePos <= 0}
+          >
+            Prev
+          </button>
+          <button
+            className={buttonBase}
+            onClick={() => goToChange(activeChangePos + 1)}
+            type="button"
+            disabled={changeLineIndices.length === 0 || activeChangePos >= changeLineIndices.length - 1}
+          >
+            Next
+          </button>
+        </div>
+      </div>
       <div ref={scrollRef} className="json-scroll rounded-xl border border-[var(--border)] relative">
-        <div className={maximized ? "flex gap-3 min-w-[760px]" : "grid grid-cols-2 gap-3 min-w-[720px]"}>
-          <div className={maximized ? "flex-1 min-w-0 overflow-hidden" : "overflow-hidden"}>
+        <div className="flex gap-3 min-w-[820px]">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
               Template (A)
             </div>
@@ -778,31 +935,43 @@ export function VisualComparePanel({ result, maximized = false }: { result: Comp
                   : line.aPath
                     ? aMap.get(line.aPath)
                     : undefined;
+                const isActive = activeLine === idx;
                 return (
-                  <div key={`a-${idx}`} className={kindClass(inferred)}>
-                    <span className="whitespace-pre">{line.aText}</span>
+                  <div
+                    key={`a-${idx}`}
+                    ref={(el) => {
+                      rowRefs.current[idx] = el;
+                    }}
+                    className={`${kindClass(inferred)} json-editor-line ${isActive ? "json-line-active" : ""}`}
+                  >
+                    <span className="json-lineno" aria-hidden="true">
+                      {idx + 1}
+                    </span>
+                    {renderTokenLine(aTokens?.[idx], line.aText)}
                   </div>
                 );
               })}
             </div>
           </div>
-          {maximized ? (
-            <>
-              <div className="flex-none w-[10px] overflow-hidden">
-                <div className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]" aria-hidden="true">
-                  &nbsp;
-                </div>
-                {gutter}
-              </div>
-              <div className="flex-none w-[14px] overflow-hidden">
-                <div className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]" aria-hidden="true">
-                  &nbsp;
-                </div>
-                <div className="py-[10px] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)]">{scrollbar}</div>
-              </div>
-            </>
-          ) : null}
-          <div className={maximized ? "flex-1 min-w-0 overflow-hidden" : "overflow-hidden"}>
+          <div className="flex-none w-[10px] overflow-hidden">
+            <div
+              className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]"
+              aria-hidden="true"
+            >
+              &nbsp;
+            </div>
+            {gutter}
+          </div>
+          <div className="flex-none w-[14px] overflow-hidden hidden sm:block">
+            <div
+              className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]"
+              aria-hidden="true"
+            >
+              &nbsp;
+            </div>
+            <div className="py-[10px] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)]">{scrollbar}</div>
+          </div>
+          <div className="flex-1 min-w-0 overflow-hidden">
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
               Aligned (B)
             </div>
@@ -813,9 +982,13 @@ export function VisualComparePanel({ result, maximized = false }: { result: Comp
                   : line.bPath
                     ? bMap.get(line.bPath)
                     : undefined;
+                const isActive = activeLine === idx;
                 return (
-                  <div key={`b-${idx}`} className={kindClass(inferred)}>
-                    <span className="whitespace-pre">{line.bText}</span>
+                  <div key={`b-${idx}`} className={`${kindClass(inferred)} json-editor-line ${isActive ? "json-line-active" : ""}`}>
+                    <span className="json-lineno" aria-hidden="true">
+                      {idx + 1}
+                    </span>
+                    {renderTokenLine(bTokens?.[idx], line.bText)}
                   </div>
                 );
               })}

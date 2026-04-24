@@ -46,11 +46,12 @@ export default function Page() {
   const [targetText, setTargetText] = useState<string>("");
   const { reorderArrays, toggleReorderArrays } = useReorderArrays();
 
+  const [viewMode, setViewMode] = useState<"editing" | "results">("editing");
   const [error, setError] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [result, setResult] = useState<SortResult | null>(null);
   const [compare, setCompare] = useState<CompareResult | null>(null);
-  const [activeTab, setActiveTab] = useState<"result" | "compare">("result");
+  const [activeTab, setActiveTab] = useState<"result" | "compare">("compare");
   const [inputsCollapsed, setInputsCollapsed] = useState<boolean>(false);
   const [validationA, setValidationA] = useState<ValidationResult | null>(null);
   const [validationB, setValidationB] = useState<ValidationResult | null>(null);
@@ -62,6 +63,7 @@ export default function Page() {
   const resultSectionRef = useRef<HTMLElement | null>(null);
   const isOutputVisible = Boolean(result || compare);
   const bothHaveContent = Boolean(refText.trim() && targetText.trim());
+  const isResultsOnly = viewMode === "results" && isOutputVisible;
 
   const canCopy = useMemo(
     () => Boolean(result?.resultText?.length),
@@ -147,6 +149,29 @@ export default function Page() {
     setInputsCollapsed(false);
     setValidationA(null);
     setValidationB(null);
+    setViewMode("editing");
+  }
+
+  function startAgain() {
+    clearMessages();
+    setRefText("");
+    setTargetText("");
+    setResult(null);
+    setCompare(null);
+    setValidationA(null);
+    setValidationB(null);
+    setInputsCollapsed(false);
+    setActiveTab("compare");
+    setShowShareModal(false);
+    setRating(0);
+    setViewMode("editing");
+    requestAnimationFrame(() => {
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+      requestAnimationFrame(() => {
+        const el = document.getElementById("reference-json") as HTMLTextAreaElement | null;
+        el?.focus();
+      });
+    });
   }
 
   async function copyResult() {
@@ -166,6 +191,7 @@ export default function Page() {
     clearMessages();
     setResult(null);
     setCompare(null);
+    setViewMode("editing");
 
     const formatA = detectFormat(refText);
     const formatB = detectFormat(targetText);
@@ -208,8 +234,9 @@ export default function Page() {
         aIndent: indentA,
         bIndent: indentB
       });
-      setActiveTab("result");
+      setActiveTab("compare");
       setInputsCollapsed(true);
+      setViewMode("results");
       requestAnimationFrame(() => {
         resultSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
@@ -225,7 +252,7 @@ export default function Page() {
   const inputClass =
     "w-full rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] font-mono text-[12.5px] leading-relaxed p-3 focus:outline-none focus:border-[var(--accent)]";
   const jsonInputSizeClass =
-    activeTab === "compare" || isOutputVisible
+    isOutputVisible
       ? "min-h-[160px] max-h-[220px]"
       : "min-h-[520px]";
   const buttonBase =
@@ -248,9 +275,11 @@ export default function Page() {
         Skip to results
       </a>
 
-      <ToolIntro buttonClass={buttonBase} onLoadSample={onLoadSample} />
-      <ToolInfo panelClass={panelClass} />
-      <JsonInputGrid
+      {isResultsOnly ? null : (
+        <>
+          <ToolIntro buttonClass={buttonBase} onLoadSample={onLoadSample} />
+          <ToolInfo panelClass={panelClass} />
+          <JsonInputGrid
         panelClass={panelClass}
         inputClass={inputClass}
         jsonInputSizeClass={jsonInputSizeClass}
@@ -300,16 +329,6 @@ export default function Page() {
             <span aria-hidden="true">⇅</span>
             Align & Compare
           </button>
-          {result ? (
-            <button
-              className={buttonBase}
-              onClick={copyResult}
-              type="button"
-              disabled={!canCopy}
-            >
-              Copy Result
-            </button>
-          ) : null}
         </div>
 
         {error ? (
@@ -331,17 +350,40 @@ export default function Page() {
           </div>
         ) : null}
       </section>
+        </>
+      )}
 
-      <OutputSection
-        panelClass={panelClass}
-        inputClass={inputClass}
-        buttonBase={buttonBase}
-        buttonPrimary={buttonPrimary}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        resultText={result?.resultText ?? null}
-        compare={compare}
-      />
+      {isResultsOnly ? (
+        <section id="results" ref={resultSectionRef} className="mt-4">
+          <OutputSection
+            panelClass={panelClass}
+            inputClass={inputClass}
+            buttonBase={buttonBase}
+            buttonPrimary={buttonPrimary}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            resultText={result?.resultText ?? null}
+            compare={compare}
+            canCopy={canCopy}
+            onCopyResult={copyResult}
+            onStartAgain={startAgain}
+          />
+        </section>
+      ) : (
+        <OutputSection
+          panelClass={panelClass}
+          inputClass={inputClass}
+          buttonBase={buttonBase}
+          buttonPrimary={buttonPrimary}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          resultText={result?.resultText ?? null}
+          compare={compare}
+          canCopy={canCopy}
+          onCopyResult={copyResult}
+          onStartAgain={startAgain}
+        />
+      )}
 
 
       <RatingModal

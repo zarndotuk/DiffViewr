@@ -8,6 +8,9 @@ type Props = {
   inputClass: string;
   buttonBase: string;
   buttonPrimary: string;
+  canCopy: boolean;
+  onCopyResult: () => void;
+  onStartAgain: () => void;
   activeTab: "result" | "compare";
   setActiveTab: (tab: "result" | "compare") => void;
   resultText: string | null;
@@ -19,12 +22,16 @@ export function OutputSection({
   inputClass,
   buttonBase,
   buttonPrimary,
+  canCopy,
+  onCopyResult,
+  onStartAgain,
   activeTab,
   setActiveTab,
   resultText,
   compare
 }: Props) {
   const isOutputVisible = Boolean(resultText || compare);
+  const hasResultText = Boolean(resultText?.length);
 
   if (!isOutputVisible) return null;
 
@@ -33,19 +40,29 @@ export function OutputSection({
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div className="flex flex-wrap gap-2">
           <button
-            className={activeTab === "result" ? buttonPrimary : buttonBase}
-            onClick={() => setActiveTab("result")}
-            type="button"
-          >
-            Reordered Result
-          </button>
-          <button
             className={activeTab === "compare" ? buttonPrimary : buttonBase}
             onClick={() => setActiveTab("compare")}
             type="button"
           >
             Visual Compare
           </button>
+          <button
+            className={activeTab === "result" ? buttonPrimary : buttonBase}
+            onClick={() => setActiveTab("result")}
+            type="button"
+          >
+            Reordered Result
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className={buttonBase} onClick={onStartAgain} type="button">
+            Start again
+          </button>
+          {hasResultText ? (
+            <button className={buttonBase} onClick={onCopyResult} type="button" disabled={!canCopy}>
+              Copy aligned B
+            </button>
+          ) : null}
         </div>
       </div>
 

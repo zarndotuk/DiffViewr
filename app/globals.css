@@ -488,6 +488,33 @@ input {
   border-radius: 6px;
 }
 
+.json-editor-line {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.json-lineno {
+  color: var(--muted);
+  user-select: none;
+  text-align: right;
+  padding-right: 6px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.json-code {
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.json-line-active {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  animation: jsonLinePulse 650ms ease-out 1;
+}
+
 .json-line.same {
   background: color-mix(in srgb, var(--panel) 85%, transparent);
 }
@@ -506,6 +533,15 @@ input {
 
 .json-line.mismatch {
   background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+@keyframes jsonLinePulse {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 6px transparent;
+  }
 }
 
 
