@@ -62,12 +62,15 @@ export function SiteHeader() {
               height={28}
               className="h-7 w-7"
             />
-            <span className="font-display text-[15px] font-semibold tracking-[-0.2px] text-[var(--text)]">
+            <span className="font-display text-[16px] font-semibold tracking-[-0.2px] text-[var(--text)]">
               DiffViewr
             </span>
           </Link>
 
-          <nav aria-label="Primary" className="hidden md:flex items-center gap-1 text-[13px] leading-none">
+          <nav aria-label="Primary" className="hidden md:flex items-center gap-1 text-[14px] leading-none">
+          <Link className="site-menu-trigger no-underline" href="/tool">
+            Tool
+          </Link>
           <details
             ref={aboutRef}
             className="site-menu"
@@ -132,7 +135,15 @@ export function SiteHeader() {
           >
             <summary className="site-menu-trigger">Menu</summary>
             <div className="site-menu-panel" role="menu">
-              <div className="px-2 py-1 text-[11px] uppercase tracking-[1.8px] text-[var(--muted)]">
+              <Link
+                className="site-menu-item"
+                href="/tool"
+                role="menuitem"
+                onClick={closeAllMenus}
+              >
+                Tool
+              </Link>
+              <div className="px-2 py-1 text-[12px] uppercase tracking-[1.8px] text-[var(--muted)]">
                 About
               </div>
               <a
@@ -155,7 +166,7 @@ export function SiteHeader() {
               >
                 Repo
               </a>
-              <div className="mt-1 px-2 py-1 text-[11px] uppercase tracking-[1.8px] text-[var(--muted)]">
+              <div className="mt-1 px-2 py-1 text-[12px] uppercase tracking-[1.8px] text-[var(--muted)]">
                 Docs
               </div>
               <Link

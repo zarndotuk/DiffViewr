@@ -70,7 +70,7 @@ export function RatingModal({
         <h3 id="feedback-title" className="text-lg font-semibold">
           How was the experience?
         </h3>
-        <p id="feedback-desc" className="text-[13px] text-[var(--muted)] mt-2 leading-relaxed">
+        <p id="feedback-desc" className="text-[14px] text-[var(--muted)] mt-2 leading-relaxed">
           A quick star rating helps us improve.
         </p>
         <div className="mt-4 flex items-center gap-2" role="radiogroup" aria-label="Star rating">

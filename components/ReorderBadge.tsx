@@ -10,7 +10,7 @@ export function ReorderBadge() {
       <span
         title={tooltip}
         aria-label={tooltip}
-        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,transparent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[11px] leading-none"
+        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,transparent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[12px] leading-none"
       >
         ⓘ
       </span>

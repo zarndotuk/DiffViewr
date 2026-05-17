@@ -30,7 +30,7 @@ export function DiffNodeRow({
       : node.kind === "extra"
         ? "bg-[color-mix(in_srgb,var(--ok)_10%,transparent)]"
         : node.kind === "changed"
-          ? "bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]"
+          ? "bg-[color-mix(in_srgb,var(--warn)_10%,transparent)]"
           : node.kind === "type_mismatch"
             ? "bg-[color-mix(in_srgb,var(--danger)_16%,transparent)]"
             : "";
@@ -79,7 +79,7 @@ export function DiffNodeRow({
           <div className="text-sm font-semibold text-[var(--text)] break-words">
             {node.keyLabel}
           </div>
-          <span className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
+          <span className="text-[12px] uppercase tracking-wide text-[var(--muted)]">
             {badge}
           </span>
         </div>

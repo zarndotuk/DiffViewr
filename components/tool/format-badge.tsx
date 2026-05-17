@@ -53,7 +53,7 @@ export function FormatBadge({ format }: { format: FormatBadgeFormat }) {
     <span
       className={[
         "inline-flex items-center rounded-full border px-2 py-0.5",
-        "text-[11px] font-semibold tracking-wide",
+        "text-[12px] font-semibold tracking-wide",
         "bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]",
         "border-[color-mix(in_srgb,var(--accent)_32%,transparent)]",
         "text-[color-mix(in_srgb,var(--accent)_72%,var(--text))]",

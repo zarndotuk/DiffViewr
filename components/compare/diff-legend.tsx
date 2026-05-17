@@ -9,7 +9,7 @@ export function DiffLegend() {
       <span className="px-2 py-1 rounded-md border border-[var(--border)] bg-[color-mix(in_srgb,var(--ok)_12%,transparent)]">
         Extra
       </span>
-      <span className="px-2 py-1 rounded-md border border-[var(--border)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]">
+      <span className="px-2 py-1 rounded-md border border-[var(--border)] bg-[color-mix(in_srgb,var(--warn)_12%,transparent)]">
         Changed
       </span>
       <span className="px-2 py-1 rounded-md border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">

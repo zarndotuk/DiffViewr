@@ -44,13 +44,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="min-h-screen w-full bg-[var(--bg)] text-[var(--text)]">
         <SiteHeader />
-        <div className="relative isolate overflow-hidden">
-          <div className="absolute inset-0 pointer-events-none z-0">
-            <div className="absolute top-[-10%] right-[-5%] w-[400px] md:w-[600px] h-[400px] md:h-[600px] bg-indigo-600/15 rounded-full blur-[100px] animate-float" />
-            <div className="absolute bottom-[10%] left-[-10%] w-[400px] md:w-[600px] h-[400px] md:h-[600px] bg-violet-900/15 rounded-full blur-[100px] animate-float [animation-delay:1.5s]" />
-          </div>
-
-          <div className="relative z-10 mx-auto w-full max-w-screen px-10">
+        <div className="relative isolate overflow-hidden dark:dark-circuit-wrapper">
+          <div className="relative z-10 mx-auto w-full px-10">
             {children}
             <SiteFooter />
           </div>

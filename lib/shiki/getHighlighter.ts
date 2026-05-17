@@ -1,6 +1,6 @@
 "use client";
 
-export type ThemeName = "github-light" | "github-dark" | "vitesse-light" | "vitesse-dark";
+export type ThemeName = "github-light" | "github-dark" | "vitesse-light" | "vitesse-dark" | "dark-plus";
 
 export type ShikiToken = {
   content: string;
@@ -43,8 +43,8 @@ export async function getShikiHighlighter(): Promise<ShikiHighlighterLike> {
     const shiki = (await import("shiki")) as unknown as Record<string, unknown>;
 
     const themePairs: Array<[ThemeName, ThemeName]> = [
-      ["github-light", "github-dark"],
-      ["vitesse-light", "vitesse-dark"],
+      ["github-light", "dark-plus"],
+      ["vitesse-light", "dark-plus"],
     ];
 
     let lastErr: unknown = null;

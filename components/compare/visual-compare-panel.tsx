@@ -190,7 +190,7 @@ function diffKindColor(kind?: DiffKind) {
     case "extra":
       return "var(--ok)";
     case "changed":
-      return "var(--accent)";
+      return "var(--warn)";
     case "type_mismatch":
       return "color-mix(in srgb, var(--danger) 85%, var(--accent))";
     default:
@@ -343,24 +343,49 @@ function renderAligned(
     const bPrim = bArr.every(isPrimitive);
     const alignedOps = aPrim && bPrim ? alignPrimitiveArrays(aArr, bArr) : null;
 
-    if (alignedOps) {
-      let visualIndex = 0;
-      for (const op of alignedOps) {
-        const before = lines.length;
-        if (op.kind === "both") {
-          const aItem = aArr[op.aIdx];
-          const bItem = bArr[op.bIdx];
-          const aItemPath = `${aPathBase}[${op.aIdx}]`;
-          const bItemPath = `${bPathBase}[${op.bIdx}]`;
-          renderAligned(aItem, bItem, aItemPath, bItemPath, depth + 1, lines, aIndent, bIndent, true);
-          const lastIdx = lines.length - 1;
-          if (lines.length > before) {
-            if (op.aIdx < aArr.length - 1) lines[lastIdx].aText = `${lines[lastIdx].aText},`;
-            if (op.bIdx < bArr.length - 1) lines[lastIdx].bText = `${lines[lastIdx].bText},`;
+      if (alignedOps) {
+        let visualIndex = 0;
+        for (let opIndex = 0; opIndex < alignedOps.length; opIndex += 1) {
+          const op = alignedOps[opIndex];
+          const before = lines.length;
+
+          if (op.kind === "aOnly" && alignedOps[opIndex + 1]?.kind === "bOnly") {
+            const next = alignedOps[opIndex + 1] as { kind: "bOnly"; bIdx: number };
+            const aItem = aArr[op.aIdx];
+            const bItem = bArr[next.bIdx];
+            const aItemPath = `${aPathBase}[${op.aIdx}]`;
+            const bItemPath = `${bPathBase}[${next.bIdx}]`;
+            const aComma = op.aIdx < aArr.length - 1 ? "," : "";
+            const bComma = next.bIdx < bArr.length - 1 ? "," : "";
+
+            lines.push({
+              aText: `${indentOf(aIndent, depth + 1)}${formatValue(aItem)}${aComma}`,
+              bText: `${indentOf(bIndent, depth + 1)}${formatValue(bItem)}${bComma}`,
+              aPath: aItemPath,
+              bPath: bItemPath,
+              aStatus: "changed",
+              bStatus: "changed"
+            });
+
+            visualIndex += 1;
+            opIndex += 1; // consume the paired bOnly op
+            continue;
           }
-          visualIndex += 1;
-          continue;
-        }
+
+          if (op.kind === "both") {
+            const aItem = aArr[op.aIdx];
+            const bItem = bArr[op.bIdx];
+            const aItemPath = `${aPathBase}[${op.aIdx}]`;
+            const bItemPath = `${bPathBase}[${op.bIdx}]`;
+            renderAligned(aItem, bItem, aItemPath, bItemPath, depth + 1, lines, aIndent, bIndent, true);
+            const lastIdx = lines.length - 1;
+            if (lines.length > before) {
+              if (op.aIdx < aArr.length - 1) lines[lastIdx].aText = `${lines[lastIdx].aText},`;
+              if (op.bIdx < bArr.length - 1) lines[lastIdx].bText = `${lines[lastIdx].bText},`;
+            }
+            visualIndex += 1;
+            continue;
+          }
 
         if (op.kind === "aOnly") {
           const aItem = aArr[op.aIdx];
@@ -696,6 +721,14 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     };
   }, [aCode, bCode, shouldHighlight, resolvedTheme]);
 
+  const [activeChangePos, setActiveChangePos] = useState(0);
+  const [activeLine, setActiveLine] = useState<number | null>(null);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    rowRefs.current = new Array(aligned.length).fill(null);
+  }, [aligned.length]);
+
   const changeLineIndices = useMemo(() => {
     const out: number[] = [];
     for (let i = 0; i < aligned.length; i += 1) {
@@ -703,88 +736,49 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
       if (kind && kind !== "same") out.push(i);
     }
     return out;
-  }, [aligned, inferBetweenKind]);
-
-  const [activeChangePos, setActiveChangePos] = useState<number>(0);
-  useEffect(() => {
-    setActiveChangePos(0);
-  }, [changeLineIndices.length]);
+}, [aligned, inferBetweenKind]);
 
   useEffect(() => {
-    if (activeChangePos < changeLineIndices.length) return;
-    setActiveChangePos(Math.max(0, changeLineIndices.length - 1));
-  }, [activeChangePos, changeLineIndices.length]);
+    if (changeLineIndices.length === 0) {
+      setActiveChangePos(0);
+      setActiveLine(null);
+      return;
+    }
+    const pos = Math.min(activeChangePos, changeLineIndices.length - 1);
+    setActiveChangePos(pos);
+    setActiveLine(changeLineIndices[pos] ?? null);
+  }, [changeLineIndices]);
 
-  const activeLine = changeLineIndices.length
-    ? changeLineIndices[Math.min(activeChangePos, changeLineIndices.length - 1)]
-    : null;
-
-  const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
-
-  function scrollToLine(lineIndex: number) {
-    const el = scrollRef.current;
-    const row = rowRefs.current[lineIndex];
-    if (!el || !row) return;
-    const y =
-      row.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - el.clientHeight / 3;
-    el.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-  }
-
-  function goToChange(nextPos: number) {
-    if (changeLineIndices.length === 0) return;
-    const clamped = Math.max(0, Math.min(changeLineIndices.length - 1, nextPos));
-    setActiveChangePos(clamped);
-    const lineIndex = changeLineIndices[clamped];
-    if (typeof lineIndex === "number") scrollToLine(lineIndex);
-  }
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    let raf = 0;
-    const update = () => {
-      raf = 0;
-      setMetrics({
-        scrollTop: el.scrollTop,
-        scrollHeight: el.scrollHeight || 1,
-        clientHeight: el.clientHeight || 1
-      });
-    };
-
-    const onScroll = () => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(update);
-    };
-
-    update();
-    el.addEventListener("scroll", onScroll, { passive: true });
-
-    const ro = new ResizeObserver(() => update());
-    ro.observe(el);
-
-    return () => {
-      if (raf) window.cancelAnimationFrame(raf);
-      el.removeEventListener("scroll", onScroll);
-      ro.disconnect();
-    };
-  }, []);
+  const goToChange = useCallback((pos: number) => {
+    if (pos < 0 || pos >= changeLineIndices.length) return;
+    setActiveChangePos(pos);
+    const lineIdx = changeLineIndices[pos];
+    setActiveLine(lineIdx);
+    const el = rowRefs.current[lineIdx];
+    if (el && scrollRef.current) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}, [changeLineIndices]);
 
   const gutter = useMemo(() => {
+    const changeSet = new Set(changeLineIndices);
     return (
       <div
         className="py-[10px] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)]"
-        style={{ fontFamily: "var(--mono)", fontSize: 12, lineHeight: 1.6 }}
+        style={{ fontFamily: "var(--mono)", fontSize: 14, lineHeight: 1.6 }}
       >
         {aligned.map((line, idx) => {
-          const kind = inferBetweenKind(line);
+          const isChange = changeSet.has(idx);
+          const kind = isChange ? inferBetweenKind(line) : undefined;
           const color = diffKindColor(kind);
           return (
-            <div key={`g-${idx}`} className="relative py-[2px]">
-              <span className="whitespace-pre text-transparent select-none">.</span>
-              {color !== "transparent" ? (
+            <div key={`g-${idx}`} className="relative flex items-center justify-center py-[2px]">
+              <span className="text-transparent select-none" aria-hidden="true">
+                .
+              </span>
+              {isChange ? (
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 top-[2px] bottom-[2px] w-[6px] rounded-md"
+                  className="absolute w-[6px] h-[12px] rounded-md"
                   style={{ background: color }}
                   aria-hidden="true"
                 />
@@ -794,7 +788,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
         })}
       </div>
     );
-  }, [aligned, inferBetweenKind]);
+  }, [aligned, inferBetweenKind, changeLineIndices]);
 
   const scrollbar = useMemo(() => {
     const clientHeight = metrics.clientHeight || 1;
@@ -878,7 +872,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
           />
           <div className="text-sm font-semibold text-[var(--text)]">
             Visual Compare
-            <span className="ml-2 text-[12px] font-normal text-[var(--muted)]">
+            <span className="ml-2 text-[14px] font-normal text-[var(--muted)]">
               DiffViewr (local-only)
             </span>
           </div>
@@ -887,7 +881,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
       <DiffSummaryBar summary={result.summary} />
       <DiffLegend />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[12px] text-[var(--muted)]">
+        <div className="text-[14px] text-[var(--muted)]">
           {changeLineIndices.length ? (
             <span>
               Change {activeChangePos + 1} / {changeLineIndices.length}
@@ -922,19 +916,19 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
           </button>
         </div>
       </div>
-      <div ref={scrollRef} className="json-scroll rounded-xl border border-[var(--border)] relative">
+      <div ref={scrollRef} className="rounded-xl border border-[var(--border)] relative w-full overflow-visible">
         <div className="flex gap-3 min-w-[820px]">
           <div className="flex-1 min-w-0 overflow-hidden">
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
               Template (A)
             </div>
-            <div className="json-view">
+            <div className="json-view w-full">
               {aligned.map((line, idx) => {
                 const inferred = line.aStatus
                   ? line.aStatus
-                  : line.aPath
-                    ? aMap.get(line.aPath)
-                    : undefined;
+                   : line.aPath
+                     ? aMap.get(line.aPath)
+                     : undefined;
                 const isActive = activeLine === idx;
                 return (
                   <div
@@ -952,30 +946,29 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
                 );
               })}
             </div>
-          </div>
+</div>
+           {/* <div className="flex-none w-[10px] overflow-hidden">
+             <div
+               className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]"
+               aria-hidden="true"
+             >
+               &nbsp;
+</div>
+          </div> */}
           <div className="flex-none w-[10px] overflow-hidden">
             <div
-              className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]"
+              className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]"
               aria-hidden="true"
             >
-              &nbsp;
+              <span className="text-transparent select-none">Template</span>
             </div>
             {gutter}
-          </div>
-          <div className="flex-none w-[14px] overflow-hidden hidden sm:block">
-            <div
-              className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]"
-              aria-hidden="true"
-            >
-              &nbsp;
-            </div>
-            <div className="py-[10px] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)]">{scrollbar}</div>
           </div>
           <div className="flex-1 min-w-0 overflow-hidden">
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
               Aligned (B)
             </div>
-            <div className="json-view">
+            <div className="json-view w-full">
               {aligned.map((line, idx) => {
                 const inferred = line.bStatus
                   ? line.bStatus
