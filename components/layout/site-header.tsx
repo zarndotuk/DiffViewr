@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef } from "react";
 
 const REPO_URL = "https://github.com/imhassanhumayun/DiffViewr";
 
 export function SiteHeader() {
+  const pathname = usePathname();
   const mobileRef = useRef<HTMLDetailsElement | null>(null);
 
   const allMenus = useMemo(
@@ -23,6 +25,13 @@ export function SiteHeader() {
     for (const ref of allMenus) {
       if (ref === except) continue;
       if (ref.current) ref.current.open = false;
+    }
+  }
+
+  function handleLogoClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (pathname === "/") {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
 
@@ -50,7 +59,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 h-16 border-b border-[rgba(255,255,255,0.05)] bg-[#080d12]/90 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-screen items-center justify-between gap-4 px-6 sm:px-10">
         <div className="flex items-center gap-3">
-          <Link href="/" className="inline-flex items-center gap-2 no-underline">
+          <Link href="/" onClick={handleLogoClick} className="inline-flex items-center gap-2 no-underline">
             <img
               src="/brand/diffviewr-mark.svg"
               alt="DiffViewr"

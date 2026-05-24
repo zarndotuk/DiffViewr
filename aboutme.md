@@ -1,65 +1,92 @@
-# Component Summaries
+# DiffViewr Codebase Map
 
-This document summarizes the purpose of each React component in the codebase.
+This document describes the current DiffViewr page, component, hook, type, and support-module structure after the Next.js 16.2 upgrade.
+
+## Framework
+
+- **Next.js**: 16.2.2
+- **React**: 19.2.x
+- **Routing model**: App Router
+- **Build output**: static export via `output: "export"` in `next.config.ts`
+- **Linting**: ESLint CLI with flat config in `eslint.config.mjs`
+
+## Pages And Layouts
+
+- **app/layout.tsx**: Root HTML shell. Defines global metadata, injects the initial theme script, imports global CSS, renders `SiteHeader`, wraps page content, and renders `SiteFooter`.
+- **app/page.tsx**: Landing page. Uses the landing hero and supporting marketing/product sections for DiffViewr.
+- **app/tool/layout.tsx**: Route layout for `/tool`. Provides tool-specific metadata while leaving rendering to the page.
+- **app/tool/page.tsx**: Main interactive diff tool page. Owns input state, validation, format detection flow, reorder/compare actions, result state, copy handling, rating modal state, and the ad-rail feature flag render.
+- **app/docs/overview/page.tsx**: Documentation overview page with quick-start guidance and links back to the tool and repository.
+- **app/not-found.tsx**: Custom 404 page.
+- **app/globals.css**: Global styles, theme variables, component utility styles, and app-wide visual treatment.
 
 ## Components
 
-- **components/tool/tool-intro.tsx**: Introductory component that displays descriptive text about the tool's purpose and a button to load sample diff data.
+### components/layout
 
-- **app/page.tsx**: Main page component managing the entire diff tool interface, including state for inputs, validation, comparison logic, and rendering of sub-components like inputs, outputs, and modals.
+- **components/layout/site-header.tsx**: Sticky global header with DiffViewr branding, primary navigation, mobile details menu behavior, and route links.
+- **components/layout/site-footer.tsx**: Global footer with product note, privacy positioning, author link, and repository link.
 
-- **components/tool/output-section.tsx**: Component for the output section, providing tabs to switch between visual compare view and reordered result view, along with action buttons for copying results and starting over.
+### components/landing
 
-- **components/compare/visual-compare-panel.tsx**: Advanced component for side-by-side visual comparison of JSON inputs, featuring syntax highlighting, diff color-coding, a mini scrollbar overview, line navigation, and a summary bar.
+- **components/landing/hero-section.tsx**: Landing page hero. Presents the core product pitch, GitHub link, primary calls to action, and the preview card.
+- **components/landing/diff-preview-card.tsx**: Animated/static preview card that demonstrates a representative config diff on the landing page.
 
-- **components/tool/validation-status.tsx**: Displays validation feedback for input fields, showing validity status, error messages, and a button to jump to specific lines in the input.
+### components/tool
 
-- **components/tool/tool-info.tsx**: Collapsible information panel explaining what the tool does (reordering keys for diff-friendly output) and what it does not do (e.g., no data merging).
+- **components/tool/json-input-grid.tsx**: Two-panel input grid for Template A and Target B. Handles textarea rendering, format badges, validation messages, line jump actions, and collapsed-input behavior once output is visible.
+- **components/tool/output-section.tsx**: Results surface. Switches between visual compare and reordered result tabs, renders copy/start-over actions, and lazy-loads the visual compare panel.
+- **components/tool/format-badge.tsx**: Animated format badge for JSON, YAML, .ENV, and unknown input states.
+- **components/tool/rating-modal.tsx**: Client-side feedback modal used after successful tool interactions.
+- **components/tool/reorder-badge.tsx**: Informational badge shown in the diff summary bar to communicate that Target B was reordered to match Template A.
 
-- **components/tool/json-input-grid.tsx**: Renders a responsive grid for two JSON input textareas (Template A and Target B), including format badges, validation statuses, and collapse/expand functionality when outputs are visible.
+### components/compare
 
-- **components/tool/format-badge.tsx**: Animated badge component that displays the detected input format (e.g., JSON, YAML) with color-coding and transitions.
+- **components/compare/visual-compare-panel.tsx**: Side-by-side visual diff viewer. Builds aligned line pairs, syntax tokenizes content, renders gutters, mini-map markers, scroll sync, active filters, and summary interaction.
+- **components/compare/diff-summary-bar.tsx**: Filterable summary strip for missing, extra, changed, and type-mismatch counts. Includes the reorder badge.
 
-- **components/site/site-header.tsx**: Site navigation header with menus for About (author/repo links) and Docs, plus a theme selector; includes mobile-friendly dropdown menus.
+## Hooks
 
-- **components/compare/diff-summary-bar.tsx**: Summary bar displaying counts of diff statistics (missing in B, extra in B, changed values, type mismatches) with a reorder indicator badge.
+- **hooks/use-format-detection.ts**: Debounced format detection hook used by input panels.
+- **hooks/use-reorder-arrays.ts**: Persists and toggles the "Reorder arrays to match A" user preference.
 
-- **components/ReorderBadge.tsx**: Informational badge indicating that Target B's keys have been reordered to match Template A's structure, with a tooltip.
+## Types
 
-- **app/layout.tsx**: Root layout component that applies fonts, metadata, theme initialization script, and renders the site header and footer around page content, with background animations.
+- **types/diff.ts**: Shared diff domain types, including `DiffKind`, `DiffNode`, `DiffSummary`, and `CompareResult`.
 
-- **app/docs/overview/page.tsx**: Documentation overview page providing a description of the tool, quick start steps, and navigation links back to the tool and to the GitHub repo.
+## Lib Modules
 
-- **components/tool/rating-modal.tsx**: Modal dialog for collecting user feedback via star ratings, with confirmation and close options.
+- **lib/flags.ts**: Environment-backed feature flags. `adsEnabled` is true only when `NEXT_PUBLIC_ADS_ENABLED` is exactly true after lowercase/trim normalization.
+- **lib/utils.ts**: Shared utility helpers, currently `cn()` for class name joining.
+- **lib/detectFormat.ts**: Detects whether input content appears to be JSON, YAML, .ENV, or unknown.
+- **lib/validateInput.ts**: Validates supported input formats and returns structured validation results.
+- **lib/stringifyLikeInput.ts**: Serializes output using indentation inferred from the original input.
+- **lib/jsonText.ts**: JSON text helpers.
+- **lib/jsonPath.ts**: JSON path parsing and node lookup helpers.
+- **lib/serialize.ts**: Primitive type definitions and serialization helpers.
+- **lib/diagnostics.ts**: Diagnostic result types and helpers for reorder operations.
+- **lib/reorderArray.ts**: Array reordering logic.
+- **lib/reorderObject.ts**: Object key reordering logic.
+- **lib/reorderByTemplate.ts**: High-level template-driven reorder workflow.
+- **lib/diff/compareJson.ts**: Entry point for recursive diff node creation.
+- **lib/diff/compareObjects.ts**: Object comparison logic.
+- **lib/diff/compareArrays.ts**: Array comparison logic for primitive, object, mixed, and index-based cases.
+- **lib/diff/buildSummary.ts**: Produces aggregate diff counts from a diff tree.
+- **lib/diff/getValueByPath.ts**: Reads nested values by path.
+- **lib/diff/toTypedKey.ts**: Formats typed keys and primitive values for matching.
+- **lib/shiki/getHighlighter.ts**: Shiki highlighter setup and tokenization helpers for JSON, YAML, and dotenv content.
 
-- **components/site/theme-selector.tsx**: Dropdown selector for theme preferences (light, dark, system), persisting to localStorage and applying changes dynamically.
+## Environment Files
 
-- **components/site/site-footer.tsx**: Site footer with credits, privacy notes, and links to the author and GitHub repository.
+- **.env.example**: Documents `NEXT_PUBLIC_ADS_ENABLED=false`.
+- **.env.local**: Local-only environment file, ignored by git.
 
-- **components/compare/diff-node-row.tsx**: Renders a single row in the diff tree view, showing the key path, diff badge, and side-by-side value cells for A and B, with expansion toggle for nested structures.
+## Removed During Cleanup
 
-- **components/compare/diff-tree.tsx**: Recursive component that renders the entire hierarchical diff tree, handling node expansion, filtering (differences only or show unchanged), and rendering rows.
-
-- **components/compare/diff-value-cell.tsx**: Styled cell component for displaying diff values in the tree view, color-coded based on diff kind (missing, extra, changed, etc.).
-
-- **components/compare/diff-legend.tsx**: Legend component showing color-coded examples for each diff type (missing, extra, changed, same, type mismatch) to aid interpretation.
-
-## Gutter Implementation Details
-
-The gutter in the visual compare panel is a narrow column (10px wide) that displays colored markers indicating lines with differences.
-
-Internally:
-
-- It uses a memoized component that creates a Set from changeLineIndices for O(1) lookup of changed lines.
-
-- For each aligned line, it checks if the index is in the changeSet.
-
-- If a change exists, it determines the diff kind using inferBetweenKind and maps it to a color with diffKindColor.
-
-- Each marker is a 6px wide, 12px tall rounded div, centered in a 26.4px high container (matching json-editor-line total height including padding).
-
-- The gutter container has vertical padding of 10px to align with json-view padding offset, and font styling (fontSize 14, lineHeight 1.6) matching the editor.
-
-- Dependencies (aligned, inferBetweenKind, changeLineIndices) ensure re-rendering only when necessary.
-
-This provides visual cues for navigating differences without cluttering the code view.
+- **components/compare/diff-legend.tsx**: Removed because it had no imports or runtime usage.
+- **components/layout/theme-selector.tsx**: Removed because it had no imports or runtime usage.
+- **lib/config.ts**: Removed in favor of environment-backed `lib/flags.ts`.
+- **components/site/**: Renamed to `components/layout/`.
+- **components/tool/hero-section.tsx** and **components/tool/diff-preview-card.tsx**: Moved to `components/landing/`.
+- **hooks/useFormatDetection.ts** and **hooks/useReorderArrays.ts**: Renamed to kebab-case hook filenames.
+- **lib/diff/types.ts**: Moved to `types/diff.ts`.

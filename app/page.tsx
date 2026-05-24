@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { HeroSection } from "@/components/tool/hero-section";
+import { HeroSection } from "@/components/landing/hero-section";
 
 type TrustPoint = {
   title: string;
@@ -266,7 +266,7 @@ export default function Page() {
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-10 py-12">
-        <div className="border-y border-[var(--border)] py-10">
+        <div className="border-t border-[var(--border)] py-10">
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
             <div>
               <p className="font-mono text-[12px] uppercase tracking-[1.8px] text-cyan-400">

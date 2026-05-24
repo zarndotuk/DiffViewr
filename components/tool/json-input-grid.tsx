@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { FormatBadge } from "@/components/tool/format-badge";
-import { useFormatDetection } from "@/hooks/useFormatDetection";
+import { useFormatDetection } from "@/hooks/use-format-detection";
 import type { ValidationResult } from "@/lib/validateInput";
 
 type Props = {

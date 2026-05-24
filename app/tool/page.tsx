@@ -6,14 +6,15 @@ import { useSearchParams } from "next/navigation";
 import { detectIndentFromText, stringifyLikeInput } from "@/lib/stringifyLikeInput";
 import { compareJson } from "@/lib/diff/compareJson";
 import { buildSummary } from "@/lib/diff/buildSummary";
-import type { CompareResult } from "@/lib/diff/types";
+import type { CompareResult } from "@/types/diff";
 import { JsonInputGrid } from "@/components/tool/json-input-grid";
 import type { OutputSectionProps } from "@/components/tool/output-section";
 import type { RatingModalProps } from "@/components/tool/rating-modal";
 import { detectFormat } from "@/lib/detectFormat";
 import { validateInput, type ValidationResult } from "@/lib/validateInput";
 import { reorderByTemplate } from "@/lib/reorderByTemplate";
-import { useReorderArrays } from "@/hooks/useReorderArrays";
+import { useReorderArrays } from "@/hooks/use-reorder-arrays";
+import { flags } from "@/lib/flags";
 
 type SortResult = {
   resultText: string;
@@ -61,7 +62,6 @@ function SearchParamsInit({
     if (sampleLoadedRef.current || searchParams.get("sample") !== "1") return;
     sampleLoadedRef.current = true;
     onLoadSample();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onLoadSample, searchParams]);
 
   return <>{children}</>;
@@ -343,7 +343,7 @@ const buttonPrimary =
         Skip to results
       </a>
 
-      <div className="flex gap-6 items-start w-full">
+      <div className={flags.adsEnabled ? "flex gap-6 items-start w-full" : "flex items-start w-full"}>
         <div className="flex-1 min-w-0">
       {!isResultsOnly && (
         <>
@@ -494,22 +494,24 @@ const buttonPrimary =
       )}
         </div>
 
-        <aside
-          id="ad-rail"
-          className="hidden xl:flex flex-col gap-4 w-[300px] shrink-0 pt-4 sticky top-20"
-        >
-          <div className="border border-dashed border-[var(--border)] rounded-lg flex items-center justify-center min-h-[250px] bg-[color-mix(in_srgb,var(--panel)_40%,transparent)]">
-            <span className="font-mono text-[10px] uppercase tracking-[1.6px] text-[var(--muted)] opacity-30">
-              300&times;250
-            </span>
-          </div>
+        {flags.adsEnabled && (
+          <aside
+            id="ad-rail"
+            className="hidden xl:flex flex-col gap-4 w-[300px] shrink-0 pt-4 sticky top-20"
+          >
+            <div className="border border-dashed border-[var(--border)] rounded-lg flex items-center justify-center min-h-[250px] bg-[color-mix(in_srgb,var(--panel)_40%,transparent)]">
+              <span className="font-mono text-[10px] uppercase tracking-[1.6px] text-[var(--muted)] opacity-30">
+                300&times;250
+              </span>
+            </div>
 
-          <div className="border border-dashed border-[var(--border)] rounded-lg flex items-center justify-center min-h-[600px] bg-[color-mix(in_srgb,var(--panel)_40%,transparent)]">
-            <span className="font-mono text-[10px] uppercase tracking-[1.6px] text-[var(--muted)] opacity-30">
-              300&times;600
-            </span>
-          </div>
-        </aside>
+            <div className="border border-dashed border-[var(--border)] rounded-lg flex items-center justify-center min-h-[600px] bg-[color-mix(in_srgb,var(--panel)_40%,transparent)]">
+              <span className="font-mono text-[10px] uppercase tracking-[1.6px] text-[var(--muted)] opacity-30">
+                300&times;600
+              </span>
+            </div>
+          </aside>
+        )}
       </div>
 
       <RatingModal

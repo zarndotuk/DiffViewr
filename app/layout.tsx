@@ -4,8 +4,8 @@ import {
   JetBrains_Mono
 } from "next/font/google";
 import "./globals.css";
-import { SiteHeader } from "@/components/site/site-header";
-import { SiteFooter } from "@/components/site/site-footer";
+import { SiteHeader } from "@/components/layout/site-header";
+import { SiteFooter } from "@/components/layout/site-footer";
 
 const sansFont = Geist({
   subsets: ["latin"],

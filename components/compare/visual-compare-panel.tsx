@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CompareResult, DiffNode, DiffKind } from "@/lib/diff/types";
+import type { CompareResult, DiffNode, DiffKind } from "@/types/diff";
 import { shikiTokenizeLinesForMode, type ShikiTokenLine } from "@/lib/shiki/getHighlighter";
 import { DiffSummaryBar } from "@/components/compare/diff-summary-bar";
 

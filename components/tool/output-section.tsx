@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import type { CompareResult } from "@/lib/diff/types";
+import type { CompareResult } from "@/types/diff";
 import { shikiTokenizeLines, type ShikiTokenLine } from "@/lib/shiki/getHighlighter";
 
 type VisualComparePanelProps = {

@@ -1,7 +1,7 @@
 "use client";
 
-import type { DiffSummary } from "@/lib/diff/types";
-import { ReorderBadge } from "@/components/ReorderBadge";
+import type { DiffSummary } from "@/types/diff";
+import { ReorderBadge } from "@/components/tool/reorder-badge";
 
 type FilterKind = "missing" | "extra" | "changed" | "type_mismatch";
 

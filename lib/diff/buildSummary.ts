@@ -1,4 +1,4 @@
-import type { DiffNode, DiffSummary } from "@/lib/diff/types";
+import type { DiffNode, DiffSummary } from "@/types/diff";
 
 export function buildSummary(root: DiffNode): DiffSummary {
   const summary: DiffSummary = {
