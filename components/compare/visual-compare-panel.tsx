@@ -864,7 +864,12 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
         activeFilters={activeFilterSet}
         onToggleFilter={toggleFilter}
       />
-      <div ref={scrollRef} className="rounded-xl border border-[var(--border)] relative w-full overflow-visible pb-20">
+      <div
+        ref={scrollRef}
+        className={`rounded-xl border border-[var(--border)] relative w-full overflow-visible ${
+          changeLineIndices.length > 0 ? "pb-20" : ""
+        }`}
+      >
         <div className="flex gap-3 min-w-[820px]">
           <div className="flex-1 min-w-0 overflow-hidden">
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
@@ -921,13 +926,12 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
             </div>
            </div>
          </div>
-       </div>
 
        {changeLineIndices.length > 0 && (
-         <div className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_92%,transparent)] backdrop-blur-sm rounded-full px-0.5 md:px-1 py-1 shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+         <div className="fixed bottom-6 left-1/2 z-30 flex w-fit -translate-x-1/2 items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[var(--panel)] px-0.5 py-1 shadow-[0_4px_12px_rgba(0,0,0,0.28)]">
            <button
              type="button"
-             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--muted)] hover:bg-[var(--panel)] hover:text-[var(--text)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--muted)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--text)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
              onClick={() => goToChange(activeChangePos - 1)}
              disabled={activeChangePos <= 0}
              aria-label="Previous change"
@@ -939,7 +943,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
            </span>
            <button
              type="button"
-             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--text)] font-medium hover:bg-[var(--panel)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--text)] font-medium hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
              onClick={() => goToChange(activeChangePos + 1)}
              disabled={activeChangePos >= changeLineIndices.length - 1}
              aria-label="Next change"
@@ -948,6 +952,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
            </button>
          </div>
        )}
+       </div>
      </div>
    );
  }

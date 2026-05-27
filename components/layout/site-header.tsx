@@ -31,6 +31,7 @@ export function SiteHeader() {
   function handleLogoClick(e: React.MouseEvent<HTMLAnchorElement>) {
     if (pathname === "/") {
       e.preventDefault();
+      window.history.pushState(null, "", "/");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
@@ -73,12 +74,12 @@ export function SiteHeader() {
           </Link>
 
            <nav aria-label="Primary" className="hidden md:flex items-center gap-1 text-[14px] leading-none">
-             <a
-               href="#features"
+             <Link
+               href="/#features"
                className="site-menu-trigger no-underline font-mono text-[13px] text-[var(--muted)] hover:text-[var(--text)] transition-colors"
              >
                How it works
-             </a>
+             </Link>
            </nav>
         </div>
 

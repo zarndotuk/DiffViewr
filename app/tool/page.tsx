@@ -9,7 +9,6 @@ import { buildSummary } from "@/lib/diff/buildSummary";
 import type { CompareResult } from "@/types/diff";
 import { JsonInputGrid } from "@/components/tool/json-input-grid";
 import type { OutputSectionProps } from "@/components/tool/output-section";
-import type { RatingModalProps } from "@/components/tool/rating-modal";
 import { detectFormat } from "@/lib/detectFormat";
 import { validateInput, type ValidationResult } from "@/lib/validateInput";
 import { reorderByTemplate } from "@/lib/reorderByTemplate";
@@ -33,14 +32,6 @@ const OutputSection = dynamic<OutputSectionProps>(
         Preparing results...
       </section>
     )
-  }
-);
-
-const RatingModal = dynamic<RatingModalProps>(
-  () => import("@/components/tool/rating-modal").then((mod) => mod.RatingModal),
-  {
-    ssr: false,
-    loading: () => null
   }
 );
 
@@ -83,7 +74,7 @@ export default function Page() {
   const [validationB, setValidationB] = useState<ValidationResult | null>(null);
   const refImmediateValidateNext = useRef(false);
   const targetImmediateValidateNext = useRef(false);
-  const [showRatingModal, setShowRatingModal] = useState<boolean>(false);
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState<boolean>(false);
   const [rating, setRating] = useState<number>(0);
   const [hasRated, setHasRated] = useState<boolean>(false);
   const resultSectionRef = useRef<HTMLElement | null>(null);
@@ -189,7 +180,7 @@ export default function Page() {
     setValidationB(null);
     setInputsCollapsed(false);
     setActiveTab("compare");
-    setShowRatingModal(false);
+    setShowFeedbackPrompt(false);
     setRating(0);
     setViewMode("editing");
     requestAnimationFrame(() => {
@@ -285,9 +276,7 @@ export default function Page() {
       requestAnimationFrame(() => {
         resultSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
-      if (!hasRated && window.location.hostname !== 'localhost') {
-        setShowRatingModal(true);
-      }
+      setShowFeedbackPrompt(!hasRated);
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
     }
@@ -351,8 +340,10 @@ const buttonPrimary =
           <div className="w-full bg-[var(--bg)] px-4 sm:px-6 lg:px-10">
             {/* Visual Anchor */}
             <div id="tool-input">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--panel)] mb-0">
-                <div className="flex items-center gap-3">
+              <div className="flex items-start justify-between gap-4 px-4 py-3 border-b border-[var(--border)] bg-[var(--panel)] mb-0">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="contents">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                   <h1 className="font-sans text-[15px] font-medium text-[var(--text)] tracking-tight">
                     Template A → Target B
                   </h1>
@@ -360,6 +351,11 @@ const buttonPrimary =
                   <p className="font-mono text-[12px] text-[var(--muted)]">
                     DiffViewr aligns key order and shows only what changed
                   </p>
+                    </div>
+                    <p className="font-mono text-[11px] leading-none text-[var(--muted)] opacity-80">
+                      Tip: Ctrl+Enter / Cmd+Enter to compare
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex gap-2">
@@ -372,16 +368,13 @@ const buttonPrimary =
                       </span>
                     ))}
                   </div>
-                  <span className="font-mono text-[11px] text-[var(--muted)]">
-                    100% in-browser
-                  </span>
                 </div>
               </div>
             </div>
 
             <div className="mt-8">
               <JsonInputGrid
-                panelClass={panelClass}
+                panelClass=""
                 inputClass={inputClass}
                 jsonInputSizeClass={jsonInputSizeClass}
                 buttonBase={buttonBase}
@@ -426,17 +419,14 @@ const buttonPrimary =
                   </label>
                 ) : null}
               </div>
-              <div className="sticky bottom-0 z-20 border-t border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_92%,transparent)] backdrop-blur-sm px-6 py-3 flex items-center justify-between gap-4">
-                <p className="font-mono text-[12px] text-[var(--muted)] hidden sm:block">
-                  Tip: Ctrl+Enter (or Cmd+Enter)
-                </p>
+              <div className="sticky bottom-0 z-20 bg-[color-mix(in_srgb,var(--bg)_92%,transparent)] backdrop-blur-sm px-6 py-3 flex items-center justify-between gap-4">
+                <div className="w-32 hidden sm:block" />
                 <button
                   className={ctaButton}
                   onClick={() => sortAndCompare({ reorderArrays })}
                   type="button"
                   disabled={!bothHaveContent}
-                  aria-label={bothHaveContent ? "Align and compare the two JSON configurations" : "Paste Template A and Target B to enable comparison"}
-                  aria-describedby={!bothHaveContent ? "compare-help" : undefined}
+                  aria-label="Align and compare the two JSON configurations"
                 >
                   {bothHaveContent && <span aria-hidden="true" className="text-cyan-300">✓</span>}
                   <span aria-hidden="true">⇅</span>
@@ -444,11 +434,6 @@ const buttonPrimary =
                 </button>
                 <div className="w-32 hidden sm:block" />
               </div>
-              {!bothHaveContent && (
-                <p id="compare-help" className="sr-only" aria-live="polite">
-                  Paste Template A and Target B above to compare
-                </p>
-              )}
 
               {error ? (
                 <div
@@ -488,6 +473,17 @@ const buttonPrimary =
               canCopy={canCopy}
               onCopyResult={copyResult}
               onStartAgain={startAgain}
+              showFeedbackPrompt={showFeedbackPrompt && activeTab === "compare"}
+              rating={rating}
+              onRate={setRating}
+              onDismissFeedback={() => setShowFeedbackPrompt(false)}
+              onSubmitFeedback={() => {
+                if (rating > 0) {
+                  setRatingCookie(rating);
+                  setHasRated(true);
+                }
+                setShowFeedbackPrompt(false);
+              }}
             />
           </section>
         </div>
@@ -513,23 +509,6 @@ const buttonPrimary =
           </aside>
         )}
       </div>
-
-      <RatingModal
-        open={showRatingModal}
-        rating={rating}
-        onRate={setRating}
-        onClose={() => setShowRatingModal(false)}
-        onConfirm={() => {
-          if (rating > 0) {
-            setRatingCookie(rating);
-            setHasRated(true);
-          }
-          setShowRatingModal(false);
-        }}
-        confirmDisabled={rating === 0}
-        buttonBase={buttonBase}
-        buttonPrimary={buttonPrimary}
-      />
 
         </main>
       </SearchParamsInit>
