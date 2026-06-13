@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-const REPO_URL = "https://github.com/imhassanhumayun/DiffViewr";
+const REPO_URL = "https://github.com/zarn-uk/DiffViewr";
 
 export function SiteHeader() {
   const pathname = usePathname();

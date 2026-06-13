@@ -1,4 +1,4 @@
-const REPO_URL = "https://github.com/imhassanhumayun/DiffViewr";
+const REPO_URL = "https://github.com/zarn-uk/DiffViewr";
 
 export function SiteFooter() {
   return (
