@@ -1,23 +1,20 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import posthog from "posthog-js";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
-import { detectIndentFromText, stringifyLikeInput } from "@/lib/stringifyLikeInput";
-import { compareJson } from "@/lib/diff/compareJson";
-import { buildSummary } from "@/lib/diff/buildSummary";
 import type { CompareResult } from "@/types/diff";
 import { JsonInputGrid } from "@/components/tool/json-input-grid";
 import type { OutputSectionProps } from "@/components/tool/output-section";
-import { detectFormat } from "@/lib/detectFormat";
-import { validateInput, type ValidationResult } from "@/lib/validateInput";
-import { reorderByTemplate } from "@/lib/reorderByTemplate";
+import type { SupportedFormat, ValidationResult } from "@/lib/validateInput";
 import { useReorderArrays } from "@/hooks/use-reorder-arrays";
+import { useConfigWorker } from "@/hooks/use-config-worker";
 import { flags } from "@/lib/flags";
+import { captureEvent } from "@/lib/analytics";
 
 type SortResult = {
   resultText: string;
+  targetFormat: SupportedFormat;
 };
 
 const OutputSection = dynamic<OutputSectionProps>(
@@ -60,6 +57,7 @@ function SearchParamsInit({
 }
 
 export default function Page() {
+  const { validate, compare: processCompare } = useConfigWorker();
   const [refText, setRefText] = useState<string>("");
   const [targetText, setTargetText] = useState<string>("");
   const { reorderArrays, toggleReorderArrays } = useReorderArrays();
@@ -78,7 +76,11 @@ export default function Page() {
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState<boolean>(false);
   const [rating, setRating] = useState<number>(0);
   const [hasRated, setHasRated] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const resultSectionRef = useRef<HTMLElement | null>(null);
+  const validationARequestRef = useRef(0);
+  const validationBRequestRef = useRef(0);
+  const comparisonRequestRef = useRef(0);
   const isOutputVisible = Boolean(result || compare);
   const bothHaveContent = Boolean(refText.trim() && targetText.trim());
   const isResultsOnly = viewMode === "results" && isOutputVisible;
@@ -116,48 +118,62 @@ export default function Page() {
   }, [bothHaveContent, reorderArrays]);
 
   useEffect(() => {
+    const requestId = ++validationARequestRef.current;
     const trimmed = refText.trim();
     if (!trimmed) {
       setValidationA(null);
       return;
     }
 
-    const validate = () => {
-      const format = detectFormat(refText);
-      setValidationA(validateInput(refText, format));
+    const validateInputText = async () => {
+      try {
+        const response = await validate(refText);
+        if (requestId === validationARequestRef.current) {
+          setValidationA(response.validation);
+        }
+      } catch {
+        if (requestId === validationARequestRef.current) setValidationA(null);
+      }
     };
 
     if (refImmediateValidateNext.current) {
       refImmediateValidateNext.current = false;
-      validate();
+      void validateInputText();
       return;
     }
 
-    const t = setTimeout(validate, 600);
+    const t = setTimeout(() => void validateInputText(), 600);
     return () => clearTimeout(t);
-  }, [refText]);
+  }, [refText, validate]);
 
   useEffect(() => {
+    const requestId = ++validationBRequestRef.current;
     const trimmed = targetText.trim();
     if (!trimmed) {
       setValidationB(null);
       return;
     }
 
-    const validate = () => {
-      const format = detectFormat(targetText);
-      setValidationB(validateInput(targetText, format));
+    const validateInputText = async () => {
+      try {
+        const response = await validate(targetText);
+        if (requestId === validationBRequestRef.current) {
+          setValidationB(response.validation);
+        }
+      } catch {
+        if (requestId === validationBRequestRef.current) setValidationB(null);
+      }
     };
 
     if (targetImmediateValidateNext.current) {
       targetImmediateValidateNext.current = false;
-      validate();
+      void validateInputText();
       return;
     }
 
-    const t = setTimeout(validate, 600);
+    const t = setTimeout(() => void validateInputText(), 600);
     return () => clearTimeout(t);
-  }, [targetText]);
+  }, [targetText, validate]);
 
   function setRatingCookie(value: number) {
     const maxAge = 60 * 60 * 24 * 365; // 1 year
@@ -167,7 +183,7 @@ export default function Page() {
   function submitRating() {
     if (rating <= 0) return;
 
-    posthog.capture("visual_compare_rating_submitted", {
+    captureEvent("visual_compare_rating_submitted", {
       rating,
       reorder_arrays: reorderArrays,
       missing_in_b: compare?.summary.missingInB ?? 0,
@@ -189,6 +205,7 @@ export default function Page() {
 
 
   function startAgain() {
+    comparisonRequestRef.current += 1;
     clearMessages();
     setRefText("");
     setTargetText("");
@@ -237,57 +254,32 @@ export default function Page() {
       const element = document.getElementById("tool-input");
       element?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function sortAndCompare(options?: { reorderArrays?: boolean }) {
+  async function sortAndCompare(options?: { reorderArrays?: boolean }) {
     const effectiveReorderArrays = options?.reorderArrays ?? reorderArrays;
+    const requestId = ++comparisonRequestRef.current;
 
     clearMessages();
     setResult(null);
     setCompare(null);
     setViewMode("editing");
-
-    const formatA = detectFormat(refText);
-    const formatB = detectFormat(targetText);
-
-    const aValidation = validateInput(refText, formatA);
-    const bValidation = validateInput(targetText, formatB);
-    setValidationA(aValidation);
-    setValidationB(bValidation);
-
-    if (!aValidation.valid) {
-      setError(`Fix Reference (A) (${formatA.toUpperCase()}) to continue.`);
-      return;
-    }
-    if (!bValidation.valid) {
-      setError(`Fix Target (B) (${formatB.toUpperCase()}) to continue.`);
-      return;
-    }
-
-    // The tool works with plain JS values; validation normalizes inputs into objects.
-    const refJson: unknown = aValidation.parsed;
-    const targetJson: unknown = bValidation.parsed;
-
+    setIsProcessing(true);
     try {
-      const nextRoot = reorderByTemplate(
-        targetJson as Record<string, unknown>,
-        refJson as Record<string, unknown>,
+      const processed = await processCompare(
+        refText,
+        targetText,
         effectiveReorderArrays
       );
-      const resultText = stringifyLikeInput(nextRoot, targetText);
-      const indentA = detectIndentFromText(refText) ?? 2;
-      const indentB = detectIndentFromText(targetText) ?? 2;
-      setResult({ resultText });
-      setStatus(effectiveReorderArrays ? "Reordered B (keys + arrays)." : "Reordered B (keys).");
-      const root = compareJson(refJson, nextRoot, "$", "$", "");
-      setCompare({
-        root,
-        summary: buildSummary(root),
-        aRoot: refJson,
-        bRoot: nextRoot,
-        aIndent: indentA,
-        bIndent: indentB
+      if (requestId !== comparisonRequestRef.current) return;
+      setValidationA(processed.validationA);
+      setValidationB(processed.validationB);
+      setResult({
+        resultText: processed.resultText,
+        targetFormat: processed.targetFormat
       });
+      setStatus(effectiveReorderArrays ? "Reordered B (keys + arrays)." : "Reordered B (keys).");
+      setCompare(processed.compare);
       setActiveTab("compare");
       setInputsCollapsed(true);
       setViewMode("results");
@@ -296,7 +288,10 @@ export default function Page() {
       });
       setShowFeedbackPrompt(!hasRated);
     } catch (e) {
+      if (requestId !== comparisonRequestRef.current) return;
       setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      if (requestId === comparisonRequestRef.current) setIsProcessing(false);
     }
   }
 
@@ -524,7 +519,7 @@ const buttonPrimary =
                       onChange={() => {
                         const next = !reorderArrays;
                         toggleReorderArrays();
-                        if (isOutputVisible) sortAndCompare({ reorderArrays: next });
+                        if (isOutputVisible) void sortAndCompare({ reorderArrays: next });
                       }}
                     />
                     <span>Reorder arrays to match A</span>
@@ -535,14 +530,14 @@ const buttonPrimary =
                 <div className="w-32 hidden sm:block" />
                 <button
                   className={ctaButton}
-                  onClick={() => sortAndCompare({ reorderArrays })}
+                  onClick={() => void sortAndCompare({ reorderArrays })}
                   type="button"
-                  disabled={!bothHaveContent}
+                  disabled={!bothHaveContent || isProcessing}
                   aria-label="Align and compare the two JSON configurations"
                 >
                   {bothHaveContent && <span aria-hidden="true" className="text-cyan-300">✓</span>}
                   <span aria-hidden="true">⇅</span>
-                  Compare configs
+                  {isProcessing ? "Comparing..." : "Compare configs"}
                 </button>
                 <div className="w-32 hidden sm:block" />
               </div>
@@ -581,6 +576,7 @@ const buttonPrimary =
               activeTab={activeTab}
               setActiveTab={setActiveTab}
               resultText={result?.resultText ?? null}
+              resultFormat={result?.targetFormat ?? "json"}
               compare={compare}
               canCopy={canCopy}
               onCopyResult={copyResult}

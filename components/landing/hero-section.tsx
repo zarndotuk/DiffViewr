@@ -5,7 +5,28 @@ import { DiffPreviewCard } from "@/components/landing/diff-preview-card";
 export function HeroSection() {
   return (
     <section className="hero-glow relative -mx-4 sm:-mx-6 lg:-mx-10">
-      <div className="hero-art-bg absolute inset-0" aria-hidden="true" />
+      <picture className="hero-art-bg absolute inset-0">
+        <source
+          media="(max-width: 767px)"
+          type="image/avif"
+          srcSet="/hero-technical-bg-960.avif"
+        />
+        <source
+          media="(max-width: 767px)"
+          type="image/webp"
+          srcSet="/hero-technical-bg-960.webp"
+        />
+        <source type="image/avif" srcSet="/hero-technical-bg-1823.avif" />
+        <source type="image/webp" srcSet="/hero-technical-bg-1823.webp" />
+        <img
+          src="/hero-technical-bg-1823.jpg"
+          alt=""
+          width={1823}
+          height={863}
+          decoding="async"
+          fetchPriority="high"
+        />
+      </picture>
 
       <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-10 px-4 pb-12 pt-10 sm:px-6 sm:pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14 lg:px-10 lg:pb-12 lg:pt-16">
         <div className="flex max-w-[500px] flex-col gap-5">

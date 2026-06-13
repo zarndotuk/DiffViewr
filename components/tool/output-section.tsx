@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CompareResult } from "@/types/diff";
-import { shikiTokenizeLines, type ShikiTokenLine } from "@/lib/shiki/getHighlighter";
+import type { ShikiLang, ShikiTokenLine } from "@/lib/shiki/getHighlighter";
+import type { SupportedFormat } from "@/lib/validateInput";
 
 type VisualComparePanelProps = {
   result: CompareResult;
@@ -39,6 +40,7 @@ export type OutputSectionProps = {
   activeTab: "result" | "compare";
   setActiveTab: (tab: "result" | "compare") => void;
   resultText: string | null;
+  resultFormat: SupportedFormat;
   compare: CompareResult | null;
   showFeedbackPrompt?: boolean;
   rating: number;
@@ -58,6 +60,7 @@ export function OutputSection({
   activeTab,
   setActiveTab,
   resultText,
+  resultFormat,
   compare,
   showFeedbackPrompt,
   rating,
@@ -68,22 +71,6 @@ export function OutputSection({
   const isOutputVisible = Boolean(resultText || compare);
   const hasResultText = Boolean(resultText?.length);
 
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("dark");
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-
-    const read = () => {
-      const t = document.documentElement.getAttribute("data-theme");
-      setResolvedTheme(t === "light" ? "light" : "dark");
-    };
-
-    read();
-    const mo = new MutationObserver(() => read());
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => mo.disconnect();
-  }, []);
-
   const [tokens, setTokens] = useState<ShikiTokenLine[] | null>(null);
 
   useEffect(() => {
@@ -93,15 +80,31 @@ export function OutputSection({
     }
 
     let active = true;
+    const lineCount = resultText.split("\n").length;
+    if (lineCount > 3000 || resultText.length > 300_000) return;
 
-    shikiTokenizeLines({ code: resultText, theme: 'dark-plus' }).then((lines) => {
-      if (active) setTokens(lines);
-    });
+    const lang: ShikiLang =
+      resultFormat === "yaml"
+        ? "yaml"
+        : resultFormat === "env"
+          ? "dotenv"
+          : "json";
+
+    void import("@/lib/shiki/getHighlighter")
+      .then(({ shikiTokenizeLines }) =>
+        shikiTokenizeLines({ code: resultText, lang })
+      )
+      .then((lines) => {
+        if (active) setTokens(lines);
+      })
+      .catch(() => {
+        // Plain text remains available when highlighting fails.
+      });
 
     return () => {
       active = false;
     };
-  }, [activeTab, resultText]);
+  }, [activeTab, resultFormat, resultText]);
 
   function renderTokenLine(tokens: ShikiTokenLine | undefined, fallbackText: string) {
     if (!tokens) return <span className="json-code whitespace-pre">{fallbackText}</span>;
@@ -116,32 +119,9 @@ export function OutputSection({
     );
   }
 
-  // Calculate dynamic min-height based on JSON content length
-  const getDynamicMinHeight = useMemo(() => {
-    if (!resultText) return '400px'; // Default minimum height
-
-    const lines = resultText.split('\n').length;
-    const lineHeight = 22; // Approximate pixels per line (accounting for line-height)
-    const calculatedMinHeight = Math.max(400, lines * lineHeight); // Min 400px, no max constraint
-
-    return `${calculatedMinHeight}px`;
-  }, [resultText]);
-
-  // Determine background and text colors based on app theme
-  const getContainerStyles = () => {
-    if (resolvedTheme === "dark") {
-      // In dark app theme, use dark background for result view
-      return {
-        backgroundColor: "var(--panel)",
-        color: "var(--text)"
-      };
-    } else {
-      // In light app theme, use dark background for result view to show dark-plus colors
-      return {
-        backgroundColor: "#1e1e1e",
-        color: "#f8f8f2"
-      };
-    }
+  const containerStyles = {
+    backgroundColor: "var(--panel)",
+    color: "var(--text)"
   };
 
   if (!isOutputVisible) return null;
@@ -216,16 +196,16 @@ export function OutputSection({
             <strong>A</strong> (diff-friendly). Values are unchanged.
           </div>
               <div className="json-view overflow-x-auto border border-[var(--border)] font-mono text-[13px] leading-relaxed p-3 rounded-xl sm:text-[14px]"
-               style={getContainerStyles()}>
+               style={containerStyles}>
              {resultText ? resultText.split('\n').map((line, i) => (
                <div key={i} className="json-editor-line">
-                 <span className="json-lineno" aria-hidden="true" style={{ color: getContainerStyles().color, opacity: "0.85" }}>
+                 <span className="json-lineno" aria-hidden="true" style={{ color: containerStyles.color, opacity: "0.85" }}>
                    {i + 1}
                  </span>
                  {renderTokenLine(tokens?.[i], line)}
                </div>
              )) : (
-              <span className="text-[var(--muted)]" style={{ color: getContainerStyles().color, opacity: "0.85" }}>
+              <span className="text-[var(--muted)]" style={{ color: containerStyles.color, opacity: "0.85" }}>
                 Aligned output appears here.
               </span>
             )}

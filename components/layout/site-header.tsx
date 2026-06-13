@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 const REPO_URL = "https://github.com/imhassanhumayun/DiffViewr";
 
@@ -15,11 +16,11 @@ export function SiteHeader() {
     []
   );
 
-  function closeAllMenus() {
+  const closeAllMenus = useCallback(() => {
     for (const ref of allMenus) {
       if (ref.current) ref.current.open = false;
     }
-  }
+  }, [allMenus]);
 
   function closeOtherMenus(except: { current: HTMLDetailsElement | null }) {
     for (const ref of allMenus) {
@@ -54,14 +55,14 @@ export function SiteHeader() {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [allMenus]);
+  }, [allMenus, closeAllMenus]);
 
   return (
     <header className="sticky top-0 z-40 h-16 border-b border-[rgba(255,255,255,0.05)] bg-[#080d12]/90 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-screen items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6 lg:px-10">
         <div className="flex items-center gap-3">
           <Link href="/" onClick={handleLogoClick} className="inline-flex items-center no-underline">
-            <img
+            <Image
               src="/brand/diffviewr-mark.svg"
               alt="DiffViewr"
               width={28}

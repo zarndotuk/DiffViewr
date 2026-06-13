@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CompareResult, DiffNode, DiffKind } from "@/types/diff";
-import { shikiTokenizeLinesForMode, type ShikiTokenLine } from "@/lib/shiki/getHighlighter";
+import type { ShikiTokenLine } from "@/lib/shiki/getHighlighter";
 import { DiffSummaryBar } from "@/components/compare/diff-summary-bar";
 
 function collectPaths(node: DiffNode, paths: string[] = []) {
@@ -159,14 +159,9 @@ function alignPrimitiveArrays(a: unknown[], b: unknown[]): ArrayOp[] | null {
   return ops;
 }
 
-type ScrollMetrics = {
-  scrollTop: number;
-  scrollHeight: number;
-  clientHeight: number;
-};
-
-type ResolvedTheme = "light" | "dark";
 type ActiveDiffKind = Exclude<DiffKind, "same">;
+const ROW_HEIGHT = 27;
+const VIRTUAL_OVERSCAN = 24;
 
 function diffKindPriority(kind?: DiffKind) {
   switch (kind) {
@@ -180,21 +175,6 @@ function diffKindPriority(kind?: DiffKind) {
       return 1;
     default:
       return 0;
-  }
-}
-
-function diffKindColor(kind?: DiffKind) {
-  switch (kind) {
-    case "missing":
-      return "var(--danger)";
-    case "extra":
-      return "var(--ok)";
-    case "changed":
-      return "var(--warn)";
-    case "type_mismatch":
-      return "color-mix(in srgb, var(--danger) 85%, var(--accent))";
-    default:
-      return "transparent";
   }
 }
 
@@ -645,7 +625,8 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
   }, [result.aRoot, result.bRoot, result.aIndent, result.bIndent]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [metrics, setMetrics] = useState<ScrollMetrics>({ scrollTop: 0, scrollHeight: 1, clientHeight: 1 });
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(640);
 
   const inferAForLine = useCallback(
     (line: LinePair) =>
@@ -668,22 +649,6 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     [inferAForLine, inferBForLine]
   );
 
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("dark");
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-
-    const read = () => {
-      const t = document.documentElement.getAttribute("data-theme");
-      setResolvedTheme(t === "light" ? "light" : "dark");
-    };
-
-    read();
-    const mo = new MutationObserver(() => read());
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => mo.disconnect();
-  }, []);
-
   const aCode = useMemo(() => aligned.map((l) => l.aText).join("\n"), [aligned]);
   const bCode = useMemo(() => aligned.map((l) => l.bText).join("\n"), [aligned]);
 
@@ -705,9 +670,10 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
 
     (async () => {
       try {
+        const { shikiTokenizeLines } = await import("@/lib/shiki/getHighlighter");
         const [nextA, nextB] = await Promise.all([
-          shikiTokenizeLinesForMode({ code: aCode, mode: resolvedTheme }),
-          shikiTokenizeLinesForMode({ code: bCode, mode: resolvedTheme })
+          shikiTokenizeLines({ code: aCode, lang: "json" }),
+          shikiTokenizeLines({ code: bCode, lang: "json" })
         ]);
         if (cancelled) return;
         setATokens(nextA);
@@ -720,7 +686,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     return () => {
       cancelled = true;
     };
-  }, [aCode, bCode, shouldHighlight, resolvedTheme]);
+  }, [aCode, bCode, shouldHighlight]);
 
   const [activeChangePos, setActiveChangePos] = useState(0);
   const [activeLine, setActiveLine] = useState<number | null>(null);
@@ -730,8 +696,6 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     "changed",
     "type_mismatch"
   ]);
-  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
-
   const activeFilterSet = useMemo(() => new Set<ActiveDiffKind>(activeFilters), [activeFilters]);
 
   const toggleFilter = useCallback((kind: ActiveDiffKind) => {
@@ -741,10 +705,6 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
         : [...current, kind]
     );
   }, []);
-
-  useEffect(() => {
-    rowRefs.current = new Array(aligned.length).fill(null);
-  }, [aligned.length]);
 
   const isVisibleLine = useCallback(
     (line: LinePair) => {
@@ -780,70 +740,55 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     const pos = Math.min(activeChangePos, changeLineIndices.length - 1);
     setActiveChangePos(pos);
     setActiveLine(changeLineIndices[pos] ?? null);
-  }, [changeLineIndices]);
+  }, [activeChangePos, changeLineIndices]);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const updateHeight = () => setViewportHeight(element.clientHeight);
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const virtualWindow = useMemo(() => {
+    const start = Math.max(
+      0,
+      Math.floor(scrollTop / ROW_HEIGHT) - VIRTUAL_OVERSCAN
+    );
+    const visibleCount = Math.ceil(viewportHeight / ROW_HEIGHT);
+    const end = Math.min(
+      visibleLineIndices.length,
+      start + visibleCount + VIRTUAL_OVERSCAN * 2
+    );
+    return visibleLineIndices
+      .slice(start, end)
+      .map((lineIndex, offset) => ({
+        lineIndex,
+        visiblePosition: start + offset
+      }));
+  }, [scrollTop, viewportHeight, visibleLineIndices]);
 
   const goToChange = useCallback((pos: number) => {
     if (pos < 0 || pos >= changeLineIndices.length) return;
     setActiveChangePos(pos);
     const lineIdx = changeLineIndices[pos];
     setActiveLine(lineIdx);
-    const el = rowRefs.current[lineIdx];
-    if (el && scrollRef.current) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const visiblePosition = visibleLineIndices.indexOf(lineIdx);
+    if (visiblePosition >= 0 && scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: Math.max(
+          0,
+          visiblePosition * ROW_HEIGHT -
+            scrollRef.current.clientHeight / 2 +
+            ROW_HEIGHT / 2
+        ),
+        behavior: "smooth"
+      });
     }
-}, [changeLineIndices]);
-
-  const scrollbar = useMemo(() => {
-    const clientHeight = metrics.clientHeight || 1;
-    const totalLines = Math.max(1, visibleLineIndices.length);
-
-    const bucketCount = Math.min(260, Math.max(24, Math.floor(clientHeight / 2)));
-    const buckets: { a?: DiffKind; b?: DiffKind }[] = Array.from({ length: bucketCount }, () => ({}));
-
-    for (let visiblePos = 0; visiblePos < visibleLineIndices.length; visiblePos += 1) {
-      const lineIdx = visibleLineIndices[visiblePos];
-      const bucket = Math.min(bucketCount - 1, Math.floor((visiblePos / totalLines) * bucketCount));
-      const aKind = inferAForLine(aligned[lineIdx]);
-      const bKind = inferBForLine(aligned[lineIdx]);
-      if (diffKindPriority(aKind) > diffKindPriority(buckets[bucket].a)) buckets[bucket].a = aKind;
-      if (diffKindPriority(bKind) > diffKindPriority(buckets[bucket].b)) buckets[bucket].b = bKind;
-    }
-
-    const viewportTop = (metrics.scrollTop / (metrics.scrollHeight || 1)) * clientHeight;
-    const viewportHeight = (clientHeight / (metrics.scrollHeight || 1)) * clientHeight;
-
-    return (
-      <div className="relative w-[14px]">
-        <div className="sticky top-0 h-full">
-          <div className="relative h-full rounded-md border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_65%,transparent)] overflow-hidden">
-            {buckets.map((b, i) => {
-              const top = Math.round((i / bucketCount) * clientHeight);
-              const height = Math.max(1, Math.round(clientHeight / bucketCount));
-              const aColor = diffKindColor(b.a);
-              const bColor = diffKindColor(b.b);
-              if (aColor === "transparent" && bColor === "transparent") return null;
-              return (
-                <div key={i} className="absolute left-0 right-0" style={{ top, height }}>
-                  <div className="flex h-full">
-                    <div className="w-1/2 h-full" style={{ background: aColor }} />
-                    <div className="w-1/2 h-full" style={{ background: bColor }} />
-                  </div>
-                </div>
-              );
-            })}
-            <div
-              className="absolute left-0 right-0 rounded-sm border border-[color-mix(in_srgb,var(--accent)_55%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]"
-              style={{
-                top: Math.max(0, Math.min(clientHeight - 2, viewportTop)),
-                height: Math.max(8, Math.min(clientHeight, viewportHeight))
-              }}
-              aria-hidden="true"
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }, [metrics, visibleLineIndices, aligned, inferAForLine, inferBForLine]);
+  }, [changeLineIndices, visibleLineIndices]);
 
   function renderTokenLine(tokens: ShikiTokenLine | undefined, fallbackText: string) {
     if (!tokens) return <span className="json-code whitespace-pre">{fallbackText}</span>;
@@ -893,7 +838,8 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
       </div>
       <div
         ref={scrollRef}
-        className={`relative w-full overflow-hidden rounded-xl border border-[var(--border)] md:overflow-visible ${
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+        className={`relative max-h-[70vh] min-h-[360px] w-full overflow-auto rounded-xl border border-[var(--border)] ${
           changeLineIndices.length > 0 ? "pb-20" : ""
         }`}
       >
@@ -902,8 +848,11 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
               Template (A)
             </div>
-            <div className="json-view w-full">
-              {visibleLineIndices.map((idx) => {
+            <div
+              className="json-view relative w-full"
+              style={{ height: visibleLineIndices.length * ROW_HEIGHT }}
+            >
+              {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
                 const line = aligned[idx];
                 const inferred = line.aStatus
                   ? line.aStatus
@@ -914,10 +863,11 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
                 return (
                   <div
                     key={`a-${idx}`}
-                    ref={(el) => {
-                      if (mobilePane === "a") rowRefs.current[idx] = el;
+                    className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
+                    style={{
+                      height: ROW_HEIGHT,
+                      transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
                     }}
-                    className={`${kindClass(inferred)} json-editor-line ${isActive ? "json-line-active" : ""}`}
                   >
                     <span className="json-lineno" aria-hidden="true">
                       {idx + 1}
@@ -932,8 +882,11 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
               Aligned (B)
             </div>
-            <div className="json-view w-full">
-              {visibleLineIndices.map((idx) => {
+            <div
+              className="json-view relative w-full"
+              style={{ height: visibleLineIndices.length * ROW_HEIGHT }}
+            >
+              {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
                 const line = aligned[idx];
                 const inferred = line.bStatus
                   ? line.bStatus
@@ -944,10 +897,11 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
                 return (
                   <div
                     key={`b-${idx}`}
-                    ref={(el) => {
-                      if (mobilePane === "b") rowRefs.current[idx] = el;
+                    className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
+                    style={{
+                      height: ROW_HEIGHT,
+                      transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
                     }}
-                    className={`${kindClass(inferred)} json-editor-line ${isActive ? "json-line-active" : ""}`}
                   >
                     <span className="json-lineno" aria-hidden="true">
                       {idx + 1}
