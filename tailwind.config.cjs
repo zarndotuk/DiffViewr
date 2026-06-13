@@ -4,8 +4,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-display)", "Trebuchet MS", "Segoe UI", "Arial", "sans-serif"],
-        mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
+        sans: ["var(--font-sans)", "\"Helvetica Neue\"", "Helvetica", "Arial", "sans-serif"],
+        mono: ["var(--font-mono)", "\"Source Code Pro\"", "\"Fira Code\"", "monospace"]
       }
     }
   },

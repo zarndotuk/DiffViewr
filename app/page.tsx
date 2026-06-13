@@ -1,532 +1,366 @@
-"use client";
+import Link from "next/link";
+import { HeroSection } from "@/components/landing/hero-section";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { parseJsonText } from "@/lib/jsonText";
-import { getNodeByPath, parseJsonPath, setNodeByPath } from "@/lib/jsonPath";
-import { reorderArrayAtPath } from "@/lib/reorderArray";
-import { reorderObjectKeysAtPath } from "@/lib/reorderObject";
-import type { Diagnostics } from "@/lib/diagnostics";
-import { detectIndentFromText, stringifyLikeInput } from "@/lib/stringifyLikeInput";
-import { compareJson } from "@/lib/diff/compareJson";
-import { buildSummary } from "@/lib/diff/buildSummary";
-import type { CompareResult } from "@/lib/diff/types";
-import { ToolIntro } from "@/components/tool/tool-intro";
-import { ToolInfo } from "@/components/tool/tool-info";
-import { JsonInputGrid } from "@/components/tool/json-input-grid";
-import { ValidationPanel } from "@/components/tool/validation-panel";
-import { OutputSection } from "@/components/tool/output-section";
-import { RatingModal } from "@/components/tool/rating-modal";
-import {
-  isPlainObject,
-  isPrimitive,
-  serializePrimitiveKey,
-  serializeValueKey,
-  type Primitive
-} from "@/lib/serialize";
-
-type SortResult = {
-  resultText: string;
-  diagnostics: Diagnostics;
+type TrustPoint = {
+  title: string;
+  subLabel: string;
+  icon: string;
+  href?: string;
 };
 
-const SAMPLE = {
-  path: "$.items",
-  matchField: "id",
-  reference: {
-    items: [
-      { id: "a", name: "Alpha", meta: { code: 10 } },
-      { id: "b", name: "Beta", meta: { code: 20 } },
-      { id: "c", name: "Gamma", meta: { code: 30 } }
-    ],
-    settings: { featureX: true, retries: 2 }
+const trustPoints: TrustPoint[] = [
+  {
+    title: "100% client-side",
+    subLabel: "no account, no upload",
+    icon: "ti-shield-lock"
   },
-  target: {
-    items: [
-      { id: "c", name: "Gamma", meta: { code: 30 } },
-      { id: "x", name: "Extra", meta: { code: 999 } },
-      { id: "a", name: "Alpha", meta: { code: 10 } },
-      { id: "b", name: "Beta", meta: { code: 20 } }
-    ],
-    settings: { retries: 2, featureX: true }
+  {
+    title: "JSON · YAML · .ENV",
+    subLabel: "format-aware compare",
+    icon: "ti-file-code"
+  },
+  {
+    title: "Template A → Target B",
+    subLabel: "source-of-truth flow",
+    icon: "ti-arrow-right"
+  },
+  {
+    title: "GitHub-ready",
+    subLabel: "cleaner PR diffs",
+    icon: "ti-brand-github"
   }
-} as const;
+];
+
+const leftImpactDetails = [
+  {
+    text: "44 are just key reordering",
+    color: "bg-[var(--danger)]"
+  },
+  {
+    text: "3 are real value changes",
+    color: "bg-[var(--ok)]"
+  }
+];
+
+const rightImpactDetails = [
+  "Serilog.Default changed",
+  "Serilog.Override.System changed",
+  "Api.TimeoutSeconds changed"
+];
+
+const useCases = [
+  {
+    label: "pre-release",
+    text: "Compare appsettings files before a release"
+  },
+  {
+    label: "env drift",
+    text: "Review staging vs production config"
+  },
+  {
+    label: "pull request",
+    text: "Normalize noisy JSON diffs in PRs"
+  },
+  {
+    label: "deployment",
+    text: "Spot meaningful environment changes"
+  }
+];
+
+export const metadata = {
+  title: "DiffViewr | Config File Diff Tool for Developers",
+  description:
+    "Compare appsettings, YAML, and .env config files using a template-to-target model. Paste Template A, paste Target B, see only what actually changed. 100% in-browser."
+};
 
 export default function Page() {
-  const [refText, setRefText] = useState<string>("");
-  const [targetText, setTargetText] = useState<string>("");
-
-  const [error, setError] = useState<string>("");
-  const [status, setStatus] = useState<string>("");
-  const [result, setResult] = useState<SortResult | null>(null);
-  const [compare, setCompare] = useState<CompareResult | null>(null);
-  const [activeTab, setActiveTab] = useState<"result" | "compare">("result");
-  const [inputsCollapsed, setInputsCollapsed] = useState<boolean>(false);
-  const [validationA, setValidationA] = useState<{ ok: boolean; message: string } | null>(
-    null
-  );
-  const [validationB, setValidationB] = useState<{ ok: boolean; message: string } | null>(
-    null
-  );
-  const [effectiveMatchField, setEffectiveMatchField] = useState<string>("");
-  const [showShareModal, setShowShareModal] = useState<boolean>(false);
-  const [rating, setRating] = useState<number>(0);
-  const [hasRated, setHasRated] = useState<boolean>(false);
-  const resultSectionRef = useRef<HTMLElement | null>(null);
-  const isOutputVisible = Boolean(result || compare);
-  const [outputMaximized, setOutputMaximized] = useState<boolean>(false);
-
-  const canCopy = useMemo(
-    () => Boolean(result?.resultText?.length),
-    [result?.resultText]
-  );
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const cookie = document.cookie
-      .split("; ")
-      .find(
-        (row) =>
-          row.startsWith("diffviewr_rating=") ||
-          row.startsWith("json_tool_rating=")
-      );
-    if (cookie) setHasRated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isOutputVisible) setInputsCollapsed(false);
-  }, [isOutputVisible]);
-
-  useEffect(() => {
-    if (!isOutputVisible) {
-      setOutputMaximized(false);
-    }
-  }, [isOutputVisible]);
-
-  function setRatingCookie(value: number) {
-    const maxAge = 60 * 60 * 24 * 365; // 1 year
-    document.cookie = `diffviewr_rating=${value}; max-age=${maxAge}; path=/; samesite=lax`;
-  }
-
-  function clearMessages() {
-    setError("");
-    setStatus("");
-  }
-
-  function onLoadSample() {
-    clearMessages();
-    setRefText(JSON.stringify(SAMPLE.reference, null, 2));
-    setTargetText(JSON.stringify(SAMPLE.target, null, 2));
-    setResult(null);
-    setCompare(null);
-    setInputsCollapsed(false);
-    setValidationA(null);
-    setValidationB(null);
-    setEffectiveMatchField("");
-  }
-
-  async function copyResult() {
-    clearMessages();
-    if (!result?.resultText) return;
-    try {
-      await navigator.clipboard.writeText(result.resultText);
-      setStatus("Copied result to clipboard.");
-    } catch {
-      setError("Clipboard copy failed. Your browser may block clipboard access.");
-    }
-  }
-
-  function sortAndCompare() {
-    clearMessages();
-    setResult(null);
-    setCompare(null);
-
-    let refJson: unknown;
-    let targetJson: unknown;
-    try {
-      refJson = parseJsonText(refText, "Reference JSON (A)");
-      setValidationA({ ok: true, message: "Valid JSON." });
-    } catch (e) {
-      setValidationA({ ok: false, message: String(e instanceof Error ? e.message : e) });
-      setValidationB(null);
-      setError("Fix Reference JSON (A) to continue.");
-      return;
-    }
-    try {
-      targetJson = parseJsonText(targetText, "Target JSON (B)");
-      setValidationB({ ok: true, message: "Valid JSON." });
-    } catch (e) {
-      setValidationB({ ok: false, message: String(e instanceof Error ? e.message : e) });
-      setError("Fix Target JSON (B) to continue.");
-      return;
-    }
-
-    const targetPath = "$";
-    const matchFieldPath = "";
-    let tokens;
-    try {
-      tokens = parseJsonPath(targetPath);
-    } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
-      return;
-    }
-
-    let aNode: unknown;
-    let bNode: unknown;
-    try {
-      aNode = getNodeByPath(refJson, tokens);
-      bNode = getNodeByPath(targetJson, tokens);
-    } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
-      return;
-    }
-
-    if (Array.isArray(aNode) && Array.isArray(bNode)) {
-      try {
-        const mode = detectArrayMode(aNode, bNode);
-        const detected = mode === "objects" ? detectMatchField(aNode, bNode) : "";
-        let matchPathToUse = matchFieldPath.trim() || detected;
-        const matchByValue = mode === "objects" && !matchPathToUse;
-        const { diagnostics } = reorderArrayAtPath({
-          referenceArray: aNode,
-          targetArray: bNode,
-          matchFieldPath: matchPathToUse,
-          unmatchedHandling: "append"
-        });
-        const reorderedNode = reorderArrayDeep(aNode, bNode);
-        const nextRoot = setNodeByPath(targetJson, tokens, reorderedNode);
-        const resultText = stringifyLikeInput(nextRoot, targetText);
-        const indentA = detectIndentFromText(refText) ?? 2;
-        const indentB = detectIndentFromText(targetText) ?? 2;
-        setResult({ resultText, diagnostics });
-        setStatus(
-          `Sorted array at root. ${matchByValue ? "Auto-match: by value" : matchPathToUse ? `Auto-match: ${matchPathToUse}` : ""}`.trim()
-        );
-        const root = compareJson(refJson, nextRoot, "$", "$", matchPathToUse);
-        setCompare({
-          root,
-          summary: buildSummary(root),
-          aRoot: refJson,
-          bRoot: nextRoot,
-          aIndent: indentA,
-          bIndent: indentB
-        });
-        setEffectiveMatchField(matchPathToUse);
-        setActiveTab("result");
-        setInputsCollapsed(true);
-        requestAnimationFrame(() => {
-          resultSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-        if (!hasRated) {
-          setShowShareModal(true);
-        }
-      } catch (e) {
-        setError(String(e instanceof Error ? e.message : e));
-      }
-      return;
-    }
-
-    const aIsObject =
-      typeof aNode === "object" && aNode !== null && !Array.isArray(aNode);
-    const bIsObject =
-      typeof bNode === "object" && bNode !== null && !Array.isArray(bNode);
-    if (aIsObject && bIsObject) {
-      try {
-        const { diagnostics } = reorderObjectKeysAtPath({
-          referenceObject: aNode as Record<string, unknown>,
-          targetObject: bNode as Record<string, unknown>
-        });
-        const reorderedNode = reorderObjectDeep(
-          aNode as Record<string, unknown>,
-          bNode as Record<string, unknown>
-        );
-        const nextRoot = setNodeByPath(targetJson, tokens, reorderedNode);
-        const resultText = stringifyLikeInput(nextRoot, targetText);
-        const indentA = detectIndentFromText(refText) ?? 2;
-        const indentB = detectIndentFromText(targetText) ?? 2;
-        setResult({ resultText, diagnostics });
-        setStatus("Sorted object keys at root.");
-        const root = compareJson(refJson, nextRoot, "$", "$", matchFieldPath.trim());
-        setCompare({
-          root,
-          summary: buildSummary(root),
-          aRoot: refJson,
-          bRoot: nextRoot,
-          aIndent: indentA,
-          bIndent: indentB
-        });
-        setEffectiveMatchField(matchFieldPath.trim());
-        setActiveTab("result");
-        setInputsCollapsed(true);
-        requestAnimationFrame(() => {
-          resultSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-        if (!hasRated) {
-          setShowShareModal(true);
-        }
-      } catch (e) {
-        setError(String(e instanceof Error ? e.message : e));
-      }
-      return;
-    }
-
-    if (Array.isArray(aNode) || Array.isArray(bNode)) {
-      setError(
-        "Node type mismatch at target path: one is an array and the other is not."
-      );
-      return;
-    }
-
-    if (aIsObject || bIsObject) {
-      setError(
-        "Node type mismatch at target path: one is an object and the other is not."
-      );
-      return;
-    }
-
-    setError(
-      "Target node is a primitive value. Only arrays and objects can be reordered."
-    );
-  }
-
-  function detectMatchField(refArray: unknown[], targetArray: unknown[]) {
-    const candidates = ["key", "id", "name"];
-    for (const candidate of candidates) {
-      const okRef = refArray.every(
-        (item) =>
-          item &&
-          typeof item === "object" &&
-          !Array.isArray(item) &&
-          candidate in (item as Record<string, unknown>) &&
-          isPrimitive((item as Record<string, unknown>)[candidate])
-      );
-      if (!okRef) continue;
-      const okTarget = targetArray.every(
-        (item) =>
-          item &&
-          typeof item === "object" &&
-          !Array.isArray(item) &&
-          candidate in (item as Record<string, unknown>) &&
-          isPrimitive((item as Record<string, unknown>)[candidate])
-      );
-      if (okTarget) return candidate;
-    }
-    return "";
-  }
-
-  function detectArrayMode(refArray: unknown[], targetArray: unknown[]) {
-    const refPrimitive = refArray.every((v) => isPrimitive(v));
-    const targetPrimitive = targetArray.every((v) => isPrimitive(v));
-    if (refPrimitive && targetPrimitive) return "primitives";
-    return "objects";
-  }
-
-  function reorderArrayDeep(referenceArray: unknown[], targetArray: unknown[]) {
-    const mode = detectArrayMode(referenceArray, targetArray);
-    if (mode === "primitives") {
-      const { reorderedNode } = reorderArrayAtPath({
-        referenceArray,
-        targetArray,
-        matchFieldPath: "",
-        unmatchedHandling: "append"
-      });
-      return reorderedNode;
-    }
-
-    const matchField = detectMatchField(referenceArray, targetArray);
-    const fieldTokens = matchField
-      ? parseJsonPath(
-        matchField.startsWith("[") || matchField.startsWith(".")
-          ? `$${matchField}`
-          : `$.${matchField}`
-      )
-      : null;
-
-    const bKeyToIndices = new Map<string, number[]>();
-    for (let i = 0; i < targetArray.length; i += 1) {
-      const item = targetArray[i];
-      const key = fieldTokens
-        ? serializePrimitiveKey(getNodeByPath(item, fieldTokens) as Primitive)
-        : serializeValueKey(item);
-      const queue = bKeyToIndices.get(key);
-      if (queue) queue.push(i);
-      else bKeyToIndices.set(key, [i]);
-    }
-
-    const used = new Array<boolean>(targetArray.length).fill(false);
-    const matched: unknown[] = [];
-
-    for (const refItem of referenceArray) {
-      const key = fieldTokens
-        ? serializePrimitiveKey(getNodeByPath(refItem, fieldTokens) as Primitive)
-        : serializeValueKey(refItem);
-      const queue = bKeyToIndices.get(key);
-      if (!queue || queue.length === 0) continue;
-      const idx = queue.shift() as number;
-      used[idx] = true;
-      matched.push(reorderDeep(refItem, targetArray[idx]));
-    }
-
-    const extras: unknown[] = [];
-    for (let i = 0; i < targetArray.length; i += 1) {
-      if (!used[i]) extras.push(reorderDeep(targetArray[i], targetArray[i]));
-    }
-
-    return matched.concat(extras);
-  }
-
-  function reorderObjectDeep(
-    referenceObject: Record<string, unknown>,
-    targetObject: Record<string, unknown>
-  ) {
-    const next: Record<string, unknown> = {};
-    const keys = [
-      ...Object.keys(referenceObject),
-      ...Object.keys(targetObject).filter((k) => !(k in referenceObject))
-    ];
-
-    for (const key of keys) {
-      if (!(key in targetObject)) continue;
-      const aVal = referenceObject[key];
-      const bVal = targetObject[key];
-      if (Array.isArray(aVal) && Array.isArray(bVal)) {
-        next[key] = reorderArrayDeep(aVal, bVal);
-      } else if (isPlainObject(aVal) && isPlainObject(bVal)) {
-        next[key] = reorderObjectDeep(aVal, bVal);
-      } else {
-        next[key] = bVal;
-      }
-    }
-
-    return next;
-  }
-
-  function reorderDeep(aVal: unknown, bVal: unknown): unknown {
-    if (Array.isArray(aVal) && Array.isArray(bVal)) {
-      return reorderArrayDeep(aVal, bVal);
-    }
-    if (isPlainObject(aVal) && isPlainObject(bVal)) {
-      return reorderObjectDeep(aVal, bVal);
-    }
-    return bVal;
-  }
-
-  const panelClass =
-    "rounded-xl border border-[var(--border)] bg-[linear-gradient(180deg,var(--panel),var(--panel2))] shadow-[var(--shadow)] p-4";
-  const inputClass =
-    "w-full rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_85%,transparent)] text-[var(--text)] font-mono text-[12.5px] leading-relaxed p-3 focus:outline-none focus:border-[var(--accent)]";
-  const jsonInputSizeClass =
-    activeTab === "compare" || isOutputVisible
-      ? "min-h-[160px] max-h-[220px]"
-      : "min-h-[520px]";
-  const buttonBase =
-    "px-3 py-2 rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)] text-sm hover:border-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
-  const buttonPrimary =
-    "px-3 py-2 rounded-lg border border-[var(--accent)] bg-[var(--accent-weak)] text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
-
   return (
-    <main id="main" className="py-8 flex flex-col">
-      <a
-        href="#results"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-[var(--panel)] focus:px-3 focus:py-2 focus:text-sm focus:text-[var(--text)] focus:shadow-[var(--shadow)]"
-      >
-        Skip to results
-      </a>
+    <main className="flex flex-col">
+      <HeroSection />
 
-      <ToolIntro buttonClass={buttonBase} onLoadSample={onLoadSample} />
-      <ToolInfo panelClass={panelClass} />
-      <JsonInputGrid
-        panelClass={panelClass}
-        inputClass={inputClass}
-        jsonInputSizeClass={jsonInputSizeClass}
-        buttonBase={buttonBase}
-        isOutputVisible={isOutputVisible}
-        inputsCollapsed={inputsCollapsed}
-        onToggleInputsCollapsed={() => setInputsCollapsed((v) => !v)}
-        refText={refText}
-        setRefText={setRefText}
-        targetText={targetText}
-        setTargetText={setTargetText}
-        validationA={validationA}
-        validationB={validationB}
-      />
-      <ValidationPanel panelClass={panelClass} validationA={validationA} validationB={validationB} />
-
-      <section id="results" ref={resultSectionRef} className="mt-4">
-        <div className="flex flex-wrap gap-2 justify-center">
-          <button className={buttonPrimary} onClick={sortAndCompare} type="button">
-            Sort & Compare
-          </button>
-          {result ? (
-            <button
-              className={buttonBase}
-              onClick={copyResult}
-              type="button"
-              disabled={!canCopy}
+      <section className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-3 px-0 py-6 min-[430px]:grid-cols-2 sm:py-8 lg:grid-cols-4 lg:px-10">
+        {trustPoints.map((point) => (
+          point.href ? (
+            <a
+              key={point.title}
+              href={point.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-3 rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_78%,transparent)] px-4 py-3 text-left font-mono text-[12px] text-[var(--muted)] transition hover:border-cyan-400/40 hover:text-[var(--text)]"
             >
-              Copy Result
-            </button>
-          ) : null}
-          {effectiveMatchField ? (
-            <span className="text-xs px-2 py-1 rounded-full border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_70%,transparent)]">
-              Auto-match: <strong>{effectiveMatchField}</strong>
-            </span>
-          ) : null}
-        </div>
-
-        {error ? (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="mt-2 rounded-xl border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] p-2 text-[13px]"
-          >
-            {error}
-          </div>
-        ) : null}
-        {status ? (
-          <div
-            role="status"
-            aria-live="polite"
-            className="mt-2 rounded-xl border border-[color-mix(in_srgb,var(--ok)_45%,transparent)] bg-[color-mix(in_srgb,var(--ok)_12%,transparent)] p-2 text-[13px]"
-          >
-            {status}
-          </div>
-        ) : null}
+              <i className={`ti ${point.icon} mt-0.5 text-[18px] text-cyan-400`} aria-hidden="true" />
+              <span className="min-w-0">
+                <span className="block font-bold leading-5 text-[var(--text)]">{point.title}</span>
+                <span className="block leading-5 text-[var(--muted)]">{point.subLabel}</span>
+              </span>
+            </a>
+          ) : (
+            <div
+              key={point.title}
+              className="flex items-start gap-3 rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_78%,transparent)] px-4 py-3 text-left font-mono text-[12px] text-[var(--muted)]"
+            >
+              <i className={`ti ${point.icon} mt-0.5 text-[18px] text-cyan-400`} aria-hidden="true" />
+              <span className="min-w-0">
+                <span className="block font-bold leading-5 text-[var(--text)]">{point.title}</span>
+                <span className="block leading-5 text-[var(--muted)]">{point.subLabel}</span>
+              </span>
+            </div>
+          )
+        ))}
       </section>
 
-      <OutputSection
-        panelClass={panelClass}
-        inputClass={inputClass}
-        buttonBase={buttonBase}
-        buttonPrimary={buttonPrimary}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        resultText={result?.resultText ?? null}
-        compare={compare}
-        outputMaximized={outputMaximized}
-        setOutputMaximized={setOutputMaximized}
-        onMaximize={() => {
-          setInputsCollapsed(true);
-          setOutputMaximized(true);
-        }}
-      />
+      <section className="mx-auto w-full max-w-6xl px-0 pb-8 lg:px-10">
+        <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_76%,transparent)]">
+          <div className="flex flex-col gap-4 border-b border-[var(--border)] px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-7">
+            <div>
+              <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-cyan-400">
+                <i className="ti ti-filter-code" aria-hidden="true" />
+                Signal extraction
+              </div>
+              <h2 className="mt-2 font-sans text-[clamp(1.4rem,3vw,2rem)] font-normal leading-tight tracking-tight text-[var(--text)]">
+                Review the change, not the churn.
+              </h2>
+            </div>
+            <div className="flex items-baseline gap-2 font-mono sm:text-right">
+              <span className="text-[30px] font-bold leading-none text-cyan-400">94%</span>
+              <span className="max-w-24 text-[11px] leading-4 text-[var(--muted)]">
+                less noise to inspect
+              </span>
+            </div>
+          </div>
 
+          <div className="grid lg:grid-cols-[1fr_136px_1fr]">
+            <article className="relative px-5 py-6 sm:px-7 sm:py-7">
+              <div className="mb-6 flex items-center justify-between gap-4 font-mono text-[11px]">
+                <span className="uppercase tracking-[0.12em] text-[var(--danger)]">Standard git diff</span>
+                <span className="truncate text-[var(--muted)]">appsettings.stg.json</span>
+              </div>
 
-      <RatingModal
-        open={showShareModal}
-        rating={rating}
-        onRate={setRating}
-        onClose={() => setShowShareModal(false)}
-        onConfirm={() => {
-          if (rating > 0) {
-            setRatingCookie(rating);
-            setHasRated(true);
-          }
-          setShowShareModal(false);
-        }}
-        confirmDisabled={rating === 0}
-        buttonBase={buttonBase}
-        buttonPrimary={buttonPrimary}
-      />
+              <div className="flex items-end gap-4">
+                <div className="font-mono text-[clamp(4.5rem,12vw,7rem)] font-bold leading-[0.75] tracking-[-0.08em] text-[var(--danger)]">
+                  47
+                </div>
+                <div className="pb-1 font-mono text-[11px] leading-4 text-[var(--muted)]">
+                  lines flagged
+                  <br />
+                  as changed
+                </div>
+              </div>
+
+              <div className="mt-7 grid gap-2">
+                {leftImpactDetails.map((detail) => (
+                  <div
+                    key={detail.text}
+                    className="flex items-center gap-3 border-l border-[color-mix(in_srgb,var(--danger)_38%,transparent)] bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] px-3 py-2 font-mono text-[11px] text-[var(--muted)]"
+                  >
+                    <span className={`h-1.5 w-1.5 ${detail.color}`} aria-hidden="true" />
+                    <span>{detail.text}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <div className="relative flex min-h-24 items-center justify-center border-y border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_52%,transparent)] lg:min-h-0 lg:border-x lg:border-y-0">
+              <div className="absolute left-6 right-6 top-1/2 h-px bg-[var(--border)] lg:bottom-7 lg:left-1/2 lg:right-auto lg:top-7 lg:h-auto lg:w-px" />
+              <div className="relative flex items-center gap-3 rounded-full border border-cyan-400/30 bg-[var(--bg)] px-4 py-2 font-mono text-[11px] text-cyan-400 shadow-[0_0_28px_rgba(34,211,238,0.12)] lg:flex-col lg:gap-1.5 lg:px-3">
+                <i className="ti ti-adjustments-horizontal text-[17px]" aria-hidden="true" />
+                <span>normalize</span>
+                <i className="ti ti-arrow-right text-[14px] lg:rotate-90" aria-hidden="true" />
+              </div>
+            </div>
+
+            <article className="relative bg-[linear-gradient(135deg,color-mix(in_srgb,var(--ok)_8%,transparent),transparent_58%)] px-5 py-6 sm:px-7 sm:py-7">
+              <div className="mb-6 flex items-center justify-between gap-4 font-mono text-[11px]">
+                <span className="uppercase tracking-[0.12em] text-[var(--ok)]">DiffViewr result</span>
+                <span className="flex items-center gap-1.5 text-[var(--ok)]">
+                  <i className="ti ti-circle-check-filled" aria-hidden="true" />
+                  review ready
+                </span>
+              </div>
+
+              <div className="flex items-end gap-4">
+                <div className="font-mono text-[clamp(4.5rem,12vw,7rem)] font-bold leading-[0.75] tracking-[-0.08em] text-[var(--ok)]">
+                  3
+                </div>
+                <div className="pb-1 font-mono text-[11px] leading-4 text-[var(--muted)]">
+                  real value
+                  <br />
+                  differences
+                </div>
+              </div>
+
+              <div className="mt-7 grid gap-2">
+                {rightImpactDetails.map((detail) => (
+                  <div
+                    key={detail}
+                    className="flex items-center gap-3 border-l border-[color-mix(in_srgb,var(--ok)_42%,transparent)] bg-[color-mix(in_srgb,var(--ok)_7%,transparent)] px-3 py-2 font-mono text-[11px] text-[var(--text)]"
+                  >
+                    <i className="ti ti-check text-[13px] text-[var(--ok)]" aria-hidden="true" />
+                    <span>{detail}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+
+          <div className="flex justify-center border-t border-[var(--border)] px-5 py-4">
+            <Link
+              href="/tool?sample=1"
+              className="inline-flex min-h-11 items-center justify-center gap-2 font-mono text-[12px] text-cyan-400 transition hover:text-cyan-300"
+            >
+              See this example in the tool
+              <i className="ti ti-arrow-right text-[14px]" aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" className="feature-stage relative -mx-4 overflow-hidden border-y border-[var(--border)] sm:-mx-6 lg:-mx-10">
+        <div className="feature-stage-grid absolute inset-0" aria-hidden="true" />
+
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 sm:py-16 lg:px-10 lg:py-20">
+        <div className="mb-9 max-w-3xl">
+          <p className="font-mono text-[12px] uppercase tracking-[1.8px] text-cyan-400">
+            Template · Target · diff
+          </p>
+          <h2 className="mt-3 font-sans text-[clamp(2rem,4vw,3rem)] font-normal leading-tight tracking-tight text-[var(--text)]">
+            The only diff tool that treats one file as the source of truth.
+          </h2>
+          <p className="mt-4 max-w-2xl font-sans text-[16px] font-normal leading-relaxed tracking-normal text-[var(--muted)]">
+            Most tools treat both sides equally. DiffViewr treats Template A as the reference, so your target config is aligned to it before comparison.
+          </p>
+        </div>
+
+        <div className="grid auto-rows-[minmax(210px,auto)] gap-4 lg:grid-cols-4">
+          <article className="feature-stage-card group flex flex-col gap-4 self-start overflow-hidden rounded-lg border border-[var(--border)] p-4 text-white transition duration-300 hover:border-cyan-400/40 lg:col-span-2">
+            <h3 className="font-sans text-[15px] font-medium leading-snug tracking-[-0.01em] text-white">
+              Template-aligned comparison
+            </h3>
+            <p className="max-w-xl font-sans text-[14px] font-normal leading-relaxed tracking-normal text-slate-300">
+              Reorder Target B against Template A first, then review the differences that still matter.
+            </p>
+            <div className="mt-4 grid gap-3 rounded-lg border border-cyan-400/20 bg-black/35 p-3 font-mono text-[10px] leading-5 text-slate-100 sm:grid-cols-[1fr_auto_1fr]">
+                <div className="rounded border border-white/10 bg-[#0b1620] p-3">
+                  <div className="mb-2 text-[10px] uppercase tracking-[1.4px] text-cyan-300">template.yml</div>
+                  <div className="text-slate-400">logging:</div>
+                  <div className="pl-3 text-white">level: info</div>
+                  <div className="pl-3 text-white">path: /var/log</div>
+                  <div className="text-slate-400">system:</div>
+                  <div className="pl-3 text-white">region: eu</div>
+                </div>
+                <div className="flex items-center justify-center text-[18px] text-cyan-300">→</div>
+                <div className="rounded border border-cyan-400/25 bg-[#0d1b24] p-3">
+                  <div className="mb-2 text-[10px] uppercase tracking-[1.4px] text-cyan-300">target reordered</div>
+                  <div className="text-slate-400">logging:</div>
+                  <div className="pl-3 text-white">level: debug</div>
+                  <div className="pl-3 text-white">path: /var/log</div>
+                  <div className="text-slate-400">system:</div>
+                  <div className="pl-3 text-emerald-300">region: eu</div>
+                </div>
+              </div>
+          </article>
+
+          <article className="feature-stage-card group rounded-lg border border-[var(--border)] p-5 text-white transition duration-300 hover:border-cyan-400/40 lg:col-span-2">
+            <h3 className="font-sans text-[15px] font-medium leading-snug tracking-[-0.01em] text-white">
+              Visual compare preview
+            </h3>
+            <p className="mt-2 font-sans text-[14px] font-normal leading-relaxed tracking-normal text-slate-300">
+              Changed, missing, and extra values stay readable in a fast side-by-side pass.
+            </p>
+            <div className="mt-4 grid gap-3 font-mono text-[11px] leading-5 sm:grid-cols-2">
+              <div className="rounded border border-red-400/25 bg-red-950/20 p-3">
+                <div className="mb-2 text-[10px] uppercase tracking-[1.4px] text-red-300">missing</div>
+                <div className="bg-red-400/15 px-2 py-1 text-red-200">- Serilog.Default: Warning</div>
+                <div className="px-2 py-1 text-slate-300">  Microsoft.Default: Info</div>
+              </div>
+              <div className="rounded border border-emerald-400/25 bg-emerald-950/20 p-3">
+                <div className="mb-2 text-[10px] uppercase tracking-[1.4px] text-emerald-300">added</div>
+                <div className="bg-emerald-400/15 px-2 py-1 text-emerald-200">+ System: Enabled</div>
+                <div className="px-2 py-1 text-slate-300">  Microsoft.Default: Debug</div>
+              </div>
+            </div>
+          </article>
+
+          <article className="feature-stage-card group rounded-lg border border-[var(--border)] p-5 text-white transition duration-300 hover:border-cyan-400/40">
+            <h3 className="font-sans text-[15px] font-medium leading-snug tracking-[-0.01em] text-white">
+              Format detection
+            </h3>
+            <p className="mt-2 font-sans text-[13px] font-normal leading-relaxed tracking-normal text-slate-300">
+              Paste config and get validation feedback before comparing.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2 font-mono text-[12px] font-semibold">
+              {["JSON", "YAML", ".ENV"].map((format) => (
+                <span key={format} className="rounded border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-cyan-200">
+                  {format}
+                </span>
+              ))}
+            </div>
+          </article>
+
+          <article className="feature-stage-card group rounded-lg border border-[var(--border)] p-5 text-white transition duration-300 hover:border-cyan-400/40 lg:col-span-3">
+            <h3 className="font-sans text-[15px] font-medium leading-snug tracking-[-0.01em] text-white">
+              Export clean, reordered config
+            </h3>
+            <p className="mt-2 font-sans text-[13px] font-normal leading-relaxed tracking-normal text-slate-300">
+              Generate a clean result that is easier to review, commit, and share.
+            </p>
+            <div className="mt-5 rounded-lg border border-white/10 bg-black/35 p-3">
+              <div className="mb-3 h-2 w-20 rounded-full bg-slate-700" />
+              <div className="mb-2 h-2 w-full rounded-full bg-slate-800" />
+              <div className="h-2 w-2/3 rounded-full bg-slate-800" />
+              <div className="mt-4 inline-flex rounded-lg bg-cyan-400 px-4 py-2 font-mono text-[12px] font-bold text-[#0c0e11]">
+                Copy Config
+              </div>
+            </div>
+          </article>
+        </div>
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-6xl px-0 py-10 sm:py-12 lg:px-10">
+        <div className="border-t border-[var(--border)] py-10">
+          <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
+            <div>
+              <p className="font-mono text-[12px] uppercase tracking-[1.8px] text-cyan-400">
+                Common workflows
+              </p>
+              <h2 className="mt-3 font-sans text-[2rem] font-normal leading-tight tracking-tight text-[var(--text)]">
+                For the 10 minutes before every deployment.
+              </h2>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {useCases.map((item) => (
+                <div key={item.label} className="border border-[var(--border)] px-4 py-4 font-sans text-[15px] font-normal leading-relaxed tracking-normal text-[var(--muted)]">
+                  <div className="mb-1 font-mono text-[10px] uppercase tracking-[1.4px] text-cyan-400">
+                    {item.label}
+                  </div>
+                  {item.text}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-10 flex flex-col items-center gap-4 text-center">
+            <p className="font-mono text-[13px] text-[var(--muted)]">
+              No paste limits · No watermarks · No account
+            </p>
+            <Link
+              href="/tool/"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-6 py-3 font-sans text-[15px] font-medium text-[#0c0e11] transition hover:opacity-90 sm:w-auto"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M3 8h10M9 4l4 4-4 4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Try it on your config
+            </Link>
+          </div>
+        </div>
+      </section>
 
     </main>
   );

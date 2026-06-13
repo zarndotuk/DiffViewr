@@ -1,5 +1,5 @@
 import { isPlainObject } from "@/lib/serialize";
-import type { DiffNode } from "@/lib/diff/types";
+import type { DiffNode } from "@/types/diff";
 import { compareArrays } from "@/lib/diff/compareArrays";
 import { compareObjects } from "@/lib/diff/compareObjects";
 

@@ -1,5 +1,5 @@
 import { isPlainObject } from "@/lib/serialize";
-import type { DiffNode } from "@/lib/diff/types";
+import type { DiffNode } from "@/types/diff";
 import { compareJson } from "@/lib/diff/compareJson";
 import { formatPrimitive, toTypedKey } from "@/lib/diff/toTypedKey";
 import { getValueByPath } from "@/lib/diff/getValueByPath";

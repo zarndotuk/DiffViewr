@@ -1,15 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="16" y2="16" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#0F1420"/><stop offset="100%" stop-color="#090D18"/>
-    </linearGradient>
-    <linearGradient id="accent" x1="8" y1="3" x2="8" y2="13" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#E8FF47"/><stop offset="100%" stop-color="#C4D900"/>
-    </linearGradient>
-  </defs>
-  <rect width="16" height="16" rx="4" fill="url(#bg)"/>
-  <rect x="0.5" y="0.5" width="15" height="15" rx="3.5" stroke="#2A2050" stroke-width="0.75"/>
-  <path d="M6.5 3.5 C5 3.5 4.5 4.5 4.5 5.5 L4.5 7 C4.5 7.8 4 8 3.6 8.3 C4 8.5 4.5 8.8 4.5 9.5 L4.5 11 C4.5 12 5 13 6.5 13" stroke="#A060EE" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M9.5 3.5 C11 3.5 11.5 4.5 11.5 5.5 L11.5 7 C11.5 7.8 12 8 12.4 8.3 C12 8.5 11.5 8.8 11.5 9.5 L11.5 11 C11.5 12 11 13 9.5 13" stroke="#A060EE" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="8" y1="3.8" x2="8" y2="12.2" stroke="url(#accent)" stroke-width="1.3" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="4 4 56 56" fill="none">
+  <rect width="64" height="64" rx="14" fill="#081017"/>
+  <path d="M27 15H21C18.239 15 16 17.239 16 20V44C16 46.761 18.239 49 21 49H27" stroke="#EDF9FB" stroke-width="4" stroke-linecap="round"/>
+  <path d="M37 15H43C45.761 15 48 17.239 48 20V44C48 46.761 45.761 49 43 49H37" stroke="#EDF9FB" stroke-width="4" stroke-linecap="round"/>
+  <path d="M24 24H38M28 32H42M22 40H36" stroke="#30CFD0" stroke-width="3.5" stroke-linecap="round"/>
 </svg>

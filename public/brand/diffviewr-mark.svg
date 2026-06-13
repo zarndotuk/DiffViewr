@@ -1,35 +1,10 @@
-<svg
-  xmlns="http://www.w3.org/2000/svg"
-  width="256"
-  height="256"
-  viewBox="0 0 256 256"
-  fill="none"
->
-  <rect x="20" y="20" width="216" height="216" rx="48" fill="#0B1020" />
-  <rect
-    x="20.5"
-    y="20.5"
-    width="215"
-    height="215"
-    rx="47.5"
-    stroke="#263252"
-  />
-  <path
-    d="M105 72C86 72 76 86 76 105V151C76 170 86 184 105 184"
-    stroke="#EAF0FF"
-    stroke-width="14"
-    stroke-linecap="round"
-  />
-  <path
-    d="M151 72C170 72 180 86 180 105V151C180 170 170 184 151 184"
-    stroke="#EAF0FF"
-    stroke-width="14"
-    stroke-linecap="round"
-  />
-  <path
-    d="M128 78V178"
-    stroke="#7C5CFF"
-    stroke-width="10"
-    stroke-linecap="round"
-  />
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <title>DiffViewr mark</title>
+  <rect width="256" height="256" rx="60" fill="#081017"/>
+  <rect x=".75" y=".75" width="254.5" height="254.5" rx="59.25" stroke="#294550" stroke-width="1.5"/>
+  <path d="M106 62H80C68.954 62 60 70.954 60 82V174C60 185.046 68.954 194 80 194H106" stroke="#EDF9FB" stroke-width="14" stroke-linecap="round"/>
+  <path d="M150 62H176C187.046 62 196 70.954 196 82V174C196 185.046 187.046 194 176 194H150" stroke="#EDF9FB" stroke-width="14" stroke-linecap="round"/>
+  <path d="M96 94H154" stroke="#30CFD0" stroke-width="12" stroke-linecap="round"/>
+  <path d="M110 128H168" stroke="#30CFD0" stroke-width="12" stroke-linecap="round"/>
+  <path d="M88 162H146" stroke="#30CFD0" stroke-width="12" stroke-linecap="round"/>
 </svg>

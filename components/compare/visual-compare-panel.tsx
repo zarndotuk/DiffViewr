@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { CompareResult, DiffNode, DiffKind } from "@/lib/diff/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CompareResult, DiffNode, DiffKind } from "@/types/diff";
+import type { ShikiTokenLine } from "@/lib/shiki/getHighlighter";
 import { DiffSummaryBar } from "@/components/compare/diff-summary-bar";
-import { DiffLegend } from "@/components/compare/diff-legend";
 
 function collectPaths(node: DiffNode, paths: string[] = []) {
   paths.push(node.path);
@@ -44,11 +44,11 @@ function buildKindMaps(root: DiffNode) {
 function kindClass(kind?: DiffKind) {
   switch (kind) {
     case "missing":
-      return "json-line missing";
+      return "json-line missing border-l-2 border-red-400/60";
     case "extra":
-      return "json-line extra";
+      return "json-line extra border-l-2 border-emerald-400/60";
     case "changed":
-      return "json-line changed";
+      return "json-line changed border-l-2 border-amber-400/60";
     case "type_mismatch":
       return "json-line mismatch";
     default:
@@ -159,11 +159,9 @@ function alignPrimitiveArrays(a: unknown[], b: unknown[]): ArrayOp[] | null {
   return ops;
 }
 
-type ScrollMetrics = {
-  scrollTop: number;
-  scrollHeight: number;
-  clientHeight: number;
-};
+type ActiveDiffKind = Exclude<DiffKind, "same">;
+const ROW_HEIGHT = 27;
+const VIRTUAL_OVERSCAN = 24;
 
 function diffKindPriority(kind?: DiffKind) {
   switch (kind) {
@@ -177,21 +175,6 @@ function diffKindPriority(kind?: DiffKind) {
       return 1;
     default:
       return 0;
-  }
-}
-
-function diffKindColor(kind?: DiffKind) {
-  switch (kind) {
-    case "missing":
-      return "var(--danger)";
-    case "extra":
-      return "var(--ok)";
-    case "changed":
-      return "var(--accent)";
-    case "type_mismatch":
-      return "color-mix(in srgb, var(--danger) 85%, var(--accent))";
-    default:
-      return "transparent";
   }
 }
 
@@ -340,24 +323,49 @@ function renderAligned(
     const bPrim = bArr.every(isPrimitive);
     const alignedOps = aPrim && bPrim ? alignPrimitiveArrays(aArr, bArr) : null;
 
-    if (alignedOps) {
-      let visualIndex = 0;
-      for (const op of alignedOps) {
-        const before = lines.length;
-        if (op.kind === "both") {
-          const aItem = aArr[op.aIdx];
-          const bItem = bArr[op.bIdx];
-          const aItemPath = `${aPathBase}[${op.aIdx}]`;
-          const bItemPath = `${bPathBase}[${op.bIdx}]`;
-          renderAligned(aItem, bItem, aItemPath, bItemPath, depth + 1, lines, aIndent, bIndent, true);
-          const lastIdx = lines.length - 1;
-          if (lines.length > before) {
-            if (op.aIdx < aArr.length - 1) lines[lastIdx].aText = `${lines[lastIdx].aText},`;
-            if (op.bIdx < bArr.length - 1) lines[lastIdx].bText = `${lines[lastIdx].bText},`;
+      if (alignedOps) {
+        let visualIndex = 0;
+        for (let opIndex = 0; opIndex < alignedOps.length; opIndex += 1) {
+          const op = alignedOps[opIndex];
+          const before = lines.length;
+
+          if (op.kind === "aOnly" && alignedOps[opIndex + 1]?.kind === "bOnly") {
+            const next = alignedOps[opIndex + 1] as { kind: "bOnly"; bIdx: number };
+            const aItem = aArr[op.aIdx];
+            const bItem = bArr[next.bIdx];
+            const aItemPath = `${aPathBase}[${op.aIdx}]`;
+            const bItemPath = `${bPathBase}[${next.bIdx}]`;
+            const aComma = op.aIdx < aArr.length - 1 ? "," : "";
+            const bComma = next.bIdx < bArr.length - 1 ? "," : "";
+
+            lines.push({
+              aText: `${indentOf(aIndent, depth + 1)}${formatValue(aItem)}${aComma}`,
+              bText: `${indentOf(bIndent, depth + 1)}${formatValue(bItem)}${bComma}`,
+              aPath: aItemPath,
+              bPath: bItemPath,
+              aStatus: "changed",
+              bStatus: "changed"
+            });
+
+            visualIndex += 1;
+            opIndex += 1; // consume the paired bOnly op
+            continue;
           }
-          visualIndex += 1;
-          continue;
-        }
+
+          if (op.kind === "both") {
+            const aItem = aArr[op.aIdx];
+            const bItem = bArr[op.bIdx];
+            const aItemPath = `${aPathBase}[${op.aIdx}]`;
+            const bItemPath = `${bPathBase}[${op.bIdx}]`;
+            renderAligned(aItem, bItem, aItemPath, bItemPath, depth + 1, lines, aIndent, bIndent, true);
+            const lastIdx = lines.length - 1;
+            if (lines.length > before) {
+              if (op.aIdx < aArr.length - 1) lines[lastIdx].aText = `${lines[lastIdx].aText},`;
+              if (op.bIdx < bArr.length - 1) lines[lastIdx].bText = `${lines[lastIdx].bText},`;
+            }
+            visualIndex += 1;
+            continue;
+          }
 
         if (op.kind === "aOnly") {
           const aItem = aArr[op.aIdx];
@@ -607,7 +615,8 @@ function renderAligned(
   });
 }
 
-export function VisualComparePanel({ result, maximized = false }: { result: CompareResult; maximized?: boolean }) {
+export function VisualComparePanel({ result }: { result: CompareResult }) {
+  const [mobilePane, setMobilePane] = useState<"a" | "b">("a");
   const { aMap, bMap } = useMemo(() => buildKindMaps(result.root), [result.root]);
   const aligned = useMemo(() => {
     const lines: LinePair[] = [];
@@ -616,213 +625,321 @@ export function VisualComparePanel({ result, maximized = false }: { result: Comp
   }, [result.aRoot, result.bRoot, result.aIndent, result.bIndent]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [metrics, setMetrics] = useState<ScrollMetrics>({ scrollTop: 0, scrollHeight: 1, clientHeight: 1 });
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(640);
 
-  const inferAForLine = (line: LinePair) =>
-    (line.aStatus ? line.aStatus : line.aPath ? aMap.get(line.aPath) : undefined) as DiffKind | undefined;
-  const inferBForLine = (line: LinePair) =>
-    (line.bStatus ? line.bStatus : line.bPath ? bMap.get(line.bPath) : undefined) as DiffKind | undefined;
+  const inferAForLine = useCallback(
+    (line: LinePair) =>
+      (line.aStatus ? line.aStatus : line.aPath ? aMap.get(line.aPath) : undefined) as DiffKind | undefined,
+    [aMap]
+  );
+  const inferBForLine = useCallback(
+    (line: LinePair) =>
+      (line.bStatus ? line.bStatus : line.bPath ? bMap.get(line.bPath) : undefined) as DiffKind | undefined,
+    [bMap]
+  );
 
-  const inferBetweenKind = (line: LinePair): DiffKind | undefined => {
-    if (line.bStatus === "missing") return "missing";
-    if (line.bStatus === "extra") return "extra";
-    if (line.aStatus === "missing") return "missing";
-    return mergeKind(inferAForLine(line), inferBForLine(line));
-  };
+  const inferBetweenKind = useCallback(
+    (line: LinePair): DiffKind | undefined => {
+      if (line.bStatus === "missing") return "missing";
+      if (line.bStatus === "extra") return "extra";
+      if (line.aStatus === "missing") return "missing";
+      return mergeKind(inferAForLine(line), inferBForLine(line));
+    },
+    [inferAForLine, inferBForLine]
+  );
+
+  const aCode = useMemo(() => aligned.map((l) => l.aText).join("\n"), [aligned]);
+  const bCode = useMemo(() => aligned.map((l) => l.bText).join("\n"), [aligned]);
+
+  const shouldHighlight = useMemo(() => {
+    const totalChars = aCode.length + bCode.length;
+    return aligned.length <= 3000 && totalChars <= 600_000;
+  }, [aligned.length, aCode, bCode]);
+
+  const [aTokens, setATokens] = useState<ShikiTokenLine[] | null>(null);
+  const [bTokens, setBTokens] = useState<ShikiTokenLine[] | null>(null);
 
   useEffect(() => {
-    if (!maximized) return;
-    const el = scrollRef.current;
-    if (!el) return;
-
-    let raf = 0;
-    const update = () => {
-      raf = 0;
-      setMetrics({
-        scrollTop: el.scrollTop,
-        scrollHeight: el.scrollHeight || 1,
-        clientHeight: el.clientHeight || 1
-      });
+    let cancelled = false;
+    setATokens(null);
+    setBTokens(null);
+    if (!shouldHighlight) return () => {
+      cancelled = true;
     };
 
-    const onScroll = () => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(update);
-    };
-
-    update();
-    el.addEventListener("scroll", onScroll, { passive: true });
-
-    const ro = new ResizeObserver(() => update());
-    ro.observe(el);
+    (async () => {
+      try {
+        const { shikiTokenizeLines } = await import("@/lib/shiki/getHighlighter");
+        const [nextA, nextB] = await Promise.all([
+          shikiTokenizeLines({ code: aCode, lang: "json" }),
+          shikiTokenizeLines({ code: bCode, lang: "json" })
+        ]);
+        if (cancelled) return;
+        setATokens(nextA);
+        setBTokens(nextB);
+      } catch {
+        // Best-effort highlighting only.
+      }
+    })();
 
     return () => {
-      if (raf) window.cancelAnimationFrame(raf);
-      el.removeEventListener("scroll", onScroll);
-      ro.disconnect();
+      cancelled = true;
     };
-  }, [maximized]);
+  }, [aCode, bCode, shouldHighlight]);
 
-  const gutter = useMemo(() => {
-    if (!maximized) return null;
-    return (
-      <div
-        className="py-[10px] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)]"
-        style={{ fontFamily: "var(--mono)", fontSize: 12, lineHeight: 1.6 }}
-      >
-        {aligned.map((line, idx) => {
-          const kind = inferBetweenKind(line);
-          const color = diffKindColor(kind);
-          return (
-            <div key={`g-${idx}`} className="relative py-[2px]">
-              <span className="whitespace-pre text-transparent select-none">.</span>
-              {color !== "transparent" ? (
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 top-[2px] bottom-[2px] w-[6px] rounded-md"
-                  style={{ background: color }}
-                  aria-hidden="true"
-                />
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+  const [activeChangePos, setActiveChangePos] = useState(0);
+  const [activeLine, setActiveLine] = useState<number | null>(null);
+  const [activeFilters, setActiveFilters] = useState<ActiveDiffKind[]>([
+    "missing",
+    "extra",
+    "changed",
+    "type_mismatch"
+  ]);
+  const activeFilterSet = useMemo(() => new Set<ActiveDiffKind>(activeFilters), [activeFilters]);
+
+  const toggleFilter = useCallback((kind: ActiveDiffKind) => {
+    setActiveFilters((current) =>
+      current.includes(kind)
+        ? current.filter((item) => item !== kind)
+        : [...current, kind]
     );
-  }, [aligned, maximized, aMap, bMap]);
+  }, []);
 
-  const scrollbar = useMemo(() => {
-    if (!maximized) return null;
-    const clientHeight = metrics.clientHeight || 1;
-    const totalLines = Math.max(1, aligned.length);
+  const isVisibleLine = useCallback(
+    (line: LinePair) => {
+      const kind = inferBetweenKind(line);
+      return !kind || kind === "same" || activeFilterSet.has(kind as ActiveDiffKind);
+    },
+    [activeFilterSet, inferBetweenKind]
+  );
 
-    const bucketCount = Math.min(260, Math.max(24, Math.floor(clientHeight / 2)));
-    const buckets: { a?: DiffKind; b?: DiffKind }[] = Array.from({ length: bucketCount }, () => ({}));
-
+  const visibleLineIndices = useMemo(() => {
+    const out: number[] = [];
     for (let i = 0; i < aligned.length; i += 1) {
-      const bucket = Math.min(bucketCount - 1, Math.floor((i / totalLines) * bucketCount));
-      const aKind = inferAForLine(aligned[i]);
-      const bKind = inferBForLine(aligned[i]);
-      if (diffKindPriority(aKind) > diffKindPriority(buckets[bucket].a)) buckets[bucket].a = aKind;
-      if (diffKindPriority(bKind) > diffKindPriority(buckets[bucket].b)) buckets[bucket].b = bKind;
+      if (isVisibleLine(aligned[i])) out.push(i);
     }
+    return out;
+  }, [aligned, isVisibleLine]);
 
-    const viewportTop = (metrics.scrollTop / (metrics.scrollHeight || 1)) * clientHeight;
-    const viewportHeight = (clientHeight / (metrics.scrollHeight || 1)) * clientHeight;
+  const changeLineIndices = useMemo(() => {
+    const out: number[] = [];
+    for (let i = 0; i < aligned.length; i += 1) {
+      const kind = inferBetweenKind(aligned[i]);
+      if (kind && kind !== "same" && activeFilterSet.has(kind as ActiveDiffKind)) out.push(i);
+    }
+    return out;
+}, [activeFilterSet, aligned, inferBetweenKind]);
 
-    return (
-      <div className="relative w-[14px]">
-        <div className="sticky top-0 h-full">
-          <div className="relative h-full rounded-md border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_65%,transparent)] overflow-hidden">
-            {buckets.map((b, i) => {
-              const top = Math.round((i / bucketCount) * clientHeight);
-              const height = Math.max(1, Math.round(clientHeight / bucketCount));
-              const aColor = diffKindColor(b.a);
-              const bColor = diffKindColor(b.b);
-              if (aColor === "transparent" && bColor === "transparent") return null;
-              return (
-                <div key={i} className="absolute left-0 right-0" style={{ top, height }}>
-                  <div className="flex h-full">
-                    <div className="w-1/2 h-full" style={{ background: aColor }} />
-                    <div className="w-1/2 h-full" style={{ background: bColor }} />
-                  </div>
-                </div>
-              );
-            })}
-            <div
-              className="absolute left-0 right-0 rounded-sm border border-[color-mix(in_srgb,var(--accent)_55%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]"
-              style={{
-                top: Math.max(0, Math.min(clientHeight - 2, viewportTop)),
-                height: Math.max(8, Math.min(clientHeight, viewportHeight))
-              }}
-              aria-hidden="true"
-            />
-          </div>
-        </div>
-      </div>
+  useEffect(() => {
+    if (changeLineIndices.length === 0) {
+      setActiveChangePos(0);
+      setActiveLine(null);
+      return;
+    }
+    const pos = Math.min(activeChangePos, changeLineIndices.length - 1);
+    setActiveChangePos(pos);
+    setActiveLine(changeLineIndices[pos] ?? null);
+  }, [activeChangePos, changeLineIndices]);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const updateHeight = () => setViewportHeight(element.clientHeight);
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const virtualWindow = useMemo(() => {
+    const start = Math.max(
+      0,
+      Math.floor(scrollTop / ROW_HEIGHT) - VIRTUAL_OVERSCAN
     );
-  }, [maximized, metrics, aligned, aMap, bMap]);
+    const visibleCount = Math.ceil(viewportHeight / ROW_HEIGHT);
+    const end = Math.min(
+      visibleLineIndices.length,
+      start + visibleCount + VIRTUAL_OVERSCAN * 2
+    );
+    return visibleLineIndices
+      .slice(start, end)
+      .map((lineIndex, offset) => ({
+        lineIndex,
+        visiblePosition: start + offset
+      }));
+  }, [scrollTop, viewportHeight, visibleLineIndices]);
+
+  const goToChange = useCallback((pos: number) => {
+    if (pos < 0 || pos >= changeLineIndices.length) return;
+    setActiveChangePos(pos);
+    const lineIdx = changeLineIndices[pos];
+    setActiveLine(lineIdx);
+    const visiblePosition = visibleLineIndices.indexOf(lineIdx);
+    if (visiblePosition >= 0 && scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: Math.max(
+          0,
+          visiblePosition * ROW_HEIGHT -
+            scrollRef.current.clientHeight / 2 +
+            ROW_HEIGHT / 2
+        ),
+        behavior: "smooth"
+      });
+    }
+  }, [changeLineIndices, visibleLineIndices]);
+
+  function renderTokenLine(tokens: ShikiTokenLine | undefined, fallbackText: string) {
+    if (!tokens) return <span className="json-code whitespace-pre">{fallbackText}</span>;
+    return (
+      <span className="json-code">
+        {tokens.map((t, i) => (
+          <span key={i} style={t.color ? { color: t.color } : undefined}>
+            {t.content}
+          </span>
+        ))}
+      </span>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <img
-            src="/brand/diffviewr-logo.svg"
-            width={18}
-            height={18}
-            className="w-[18px] h-[18px]"
-            alt=""
-            aria-hidden="true"
-            loading="eager"
-          />
-          <div className="text-sm font-semibold text-[var(--text)]">
-            Visual Compare
-            <span className="ml-2 text-[12px] font-normal text-[var(--muted)]">
-              DiffViewr (local-only)
-            </span>
-          </div>
-        </div>
+      <DiffSummaryBar
+        summary={result.summary}
+        activeFilters={activeFilterSet}
+        onToggleFilter={toggleFilter}
+      />
+      <div className="grid grid-cols-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1 md:hidden">
+        <button
+          type="button"
+          className={`min-h-11 rounded-md px-3 font-mono text-[12px] font-medium transition-colors ${
+            mobilePane === "a"
+              ? "bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] text-[var(--text)]"
+              : "text-[var(--muted)]"
+          }`}
+          aria-pressed={mobilePane === "a"}
+          onClick={() => setMobilePane("a")}
+        >
+          Template A
+        </button>
+        <button
+          type="button"
+          className={`min-h-11 rounded-md px-3 font-mono text-[12px] font-medium transition-colors ${
+            mobilePane === "b"
+              ? "bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] text-[var(--text)]"
+              : "text-[var(--muted)]"
+          }`}
+          aria-pressed={mobilePane === "b"}
+          onClick={() => setMobilePane("b")}
+        >
+          Aligned B
+        </button>
       </div>
-      <DiffSummaryBar summary={result.summary} />
-      <DiffLegend />
-      <div ref={scrollRef} className="json-scroll rounded-xl border border-[var(--border)] relative">
-        <div className={maximized ? "flex gap-3 min-w-[760px]" : "grid grid-cols-2 gap-3 min-w-[720px]"}>
-          <div className={maximized ? "flex-1 min-w-0 overflow-hidden" : "overflow-hidden"}>
+      <div
+        ref={scrollRef}
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+        className={`relative max-h-[70vh] min-h-[360px] w-full overflow-auto rounded-xl border border-[var(--border)] ${
+          changeLineIndices.length > 0 ? "pb-20" : ""
+        }`}
+      >
+        <div className="flex min-w-0 gap-0 md:min-w-[820px] md:gap-3">
+          <div className={`${mobilePane === "a" ? "block" : "hidden"} min-w-0 flex-1 overflow-x-auto md:block md:overflow-hidden`}>
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
-              Reference JSON (A)
+              Template (A)
             </div>
-            <div className="json-view">
-              {aligned.map((line, idx) => {
+            <div
+              className="json-view relative w-full"
+              style={{ height: visibleLineIndices.length * ROW_HEIGHT }}
+            >
+              {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
+                const line = aligned[idx];
                 const inferred = line.aStatus
                   ? line.aStatus
-                  : line.aPath
-                    ? aMap.get(line.aPath)
-                    : undefined;
+                   : line.aPath
+                     ? aMap.get(line.aPath)
+                     : undefined;
+                const isActive = activeLine === idx;
                 return (
-                  <div key={`a-${idx}`} className={kindClass(inferred)}>
-                    <span className="whitespace-pre">{line.aText}</span>
+                  <div
+                    key={`a-${idx}`}
+                    className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
+                    style={{
+                      height: ROW_HEIGHT,
+                      transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
+                    }}
+                  >
+                    <span className="json-lineno" aria-hidden="true">
+                      {idx + 1}
+                    </span>
+                    {renderTokenLine(aTokens?.[idx], line.aText)}
                   </div>
                 );
               })}
             </div>
-          </div>
-          {maximized ? (
-            <>
-              <div className="flex-none w-[10px] overflow-hidden">
-                <div className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]" aria-hidden="true">
-                  &nbsp;
-                </div>
-                {gutter}
-              </div>
-              <div className="flex-none w-[14px] overflow-hidden">
-                <div className="sticky top-0 z-10 px-1 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]" aria-hidden="true">
-                  &nbsp;
-                </div>
-                <div className="py-[10px] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)]">{scrollbar}</div>
-              </div>
-            </>
-          ) : null}
-          <div className={maximized ? "flex-1 min-w-0 overflow-hidden" : "overflow-hidden"}>
+</div>
+          <div className={`${mobilePane === "b" ? "block" : "hidden"} min-w-0 flex-1 overflow-x-auto md:block md:overflow-hidden`}>
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
-              Reordered Target (B)
+              Aligned (B)
             </div>
-            <div className="json-view">
-              {aligned.map((line, idx) => {
+            <div
+              className="json-view relative w-full"
+              style={{ height: visibleLineIndices.length * ROW_HEIGHT }}
+            >
+              {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
+                const line = aligned[idx];
                 const inferred = line.bStatus
                   ? line.bStatus
                   : line.bPath
                     ? bMap.get(line.bPath)
                     : undefined;
+                const isActive = activeLine === idx;
                 return (
-                  <div key={`b-${idx}`} className={kindClass(inferred)}>
-                    <span className="whitespace-pre">{line.bText}</span>
+                  <div
+                    key={`b-${idx}`}
+                    className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
+                    style={{
+                      height: ROW_HEIGHT,
+                      transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
+                    }}
+                  >
+                    <span className="json-lineno" aria-hidden="true">
+                      {idx + 1}
+                    </span>
+                    {renderTokenLine(bTokens?.[idx], line.bText)}
                   </div>
                 );
               })}
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+           </div>
+         </div>
+
+       {changeLineIndices.length > 0 && (
+         <div className="mobile-change-nav fixed bottom-3 left-1/2 z-30 flex w-[calc(100%_-_2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[var(--panel)] px-0.5 py-1 shadow-[0_4px_12px_rgba(0,0,0,0.28)] sm:bottom-6 sm:w-fit sm:max-w-none">
+           <button
+             type="button"
+             className="flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--muted)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--text)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+             onClick={() => goToChange(activeChangePos - 1)}
+             disabled={activeChangePos <= 0}
+             aria-label="Previous change"
+           >
+             ← Prev
+           </button>
+           <span className="font-mono text-[12px] text-[var(--muted)] px-2 border-x border-[var(--border)]">
+             {activeChangePos + 1} / {changeLineIndices.length}
+           </span>
+           <button
+             type="button"
+             className="flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--text)] font-medium hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+             onClick={() => goToChange(activeChangePos + 1)}
+             disabled={activeChangePos >= changeLineIndices.length - 1}
+             aria-label="Next change"
+           >
+             Next →
+           </button>
+         </div>
+       )}
+       </div>
+     </div>
+   );
+ }
