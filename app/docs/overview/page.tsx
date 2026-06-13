@@ -30,7 +30,7 @@ export default function DocsOverviewPage() {
             Back to tool
           </Link>
           <a
-            href="https://github.com/imhassanhumayun/DiffViewr"
+            href="https://github.com/codebyzarnuk/DiffViewr"
             target="_blank"
             rel="noopener noreferrer"
             className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_80%,transparent)] font-sans text-sm font-medium hover:border-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"

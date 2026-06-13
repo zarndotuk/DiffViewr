@@ -180,18 +180,21 @@ const paired = aLines.map((a, idx) => ({ a, b: bLines[idx] }));
 export function DiffPreviewCard() {
   return (
     <div
-      className="rounded-xl border border-[var(--border)] bg-[var(--panel)] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
+      className="overflow-hidden rounded-xl border border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-[var(--panel)] shadow-[0_28px_80px_rgba(0,8,13,0.48)]"
       role="img"
       aria-label="DiffViewr showing a minimal side-by-side JSON comparison preview"
     >
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[color-mix(in_srgb,var(--panel)_75%,transparent)] border-b border-[var(--border)]">
+      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_84%,var(--bg))] px-4 py-2.5">
         <div className="flex gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
         </div>
-        <span className="font-mono text-[11px] text-[var(--muted)]">diffviewr visual compare</span>
-        <span className="font-mono text-[10px] text-[color-mix(in_srgb,var(--muted)_75%,transparent)]">local</span>
+        <span className="font-mono text-[11px] text-[var(--text)]">DiffViewr / visual compare</span>
+        <span className="flex items-center gap-1.5 font-mono text-[10px] text-emerald-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          local
+        </span>
       </div>
 
       <div className="flex divide-x divide-[var(--border)]">
@@ -234,6 +237,21 @@ export function DiffPreviewCard() {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 border-t border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_72%,var(--panel))] px-4 py-2.5 font-mono text-[10px] sm:justify-start">
+        <span className="text-[var(--muted)]">
+          <strong className="mr-1 text-amber-300">2</strong>
+          changed
+        </span>
+        <span className="text-[var(--muted)]">
+          <strong className="mr-1 text-emerald-300">1</strong>
+          added
+        </span>
+        <span className="text-[var(--muted)]">
+          <strong className="mr-1 text-cyan-300">7</strong>
+          aligned
+        </span>
       </div>
     </div>
   );

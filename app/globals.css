@@ -726,6 +726,108 @@ input {
   }
 }
 
+.hero-glow {
+  isolation: isolate;
+}
+
+.hero-art-bg {
+  background-image:
+    linear-gradient(90deg, rgba(8, 13, 18, 0.18) 0%, rgba(8, 13, 18, 0.04) 52%, rgba(8, 13, 18, 0.12) 100%),
+    url("/hero-technical-bg.jpg");
+  background-position: center, center right;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: 0.72;
+  mask-image: linear-gradient(to bottom, black 0%, black 76%, transparent 100%);
+  pointer-events: none;
+}
+
+.hero-preview-stage {
+  position: relative;
+  isolation: isolate;
+  padding: 0.75rem;
+}
+
+.hero-preview-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--panel) 58%, transparent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
+}
+
+.hero-preview-backplate {
+  position: absolute;
+  inset: 1rem 0.25rem 0.25rem 1.25rem;
+  z-index: -2;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--panel) 88%, var(--bg));
+  transform: translate(5px, 5px) rotate(0.7deg);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.hero-preview-float {
+  animation: heroPreviewFloat 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (max-width: 767px) {
+  .hero-art-bg {
+    background-position: center, 64% center;
+    opacity: 0.48;
+  }
+}
+
+.feature-stage {
+  isolation: isolate;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--panel2) 76%, var(--bg)),
+      color-mix(in srgb, var(--panel) 92%, var(--bg))
+    );
+}
+
+.feature-stage-grid {
+  opacity: 0.26;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--accent) 12%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, transparent, black 16%, black 78%, transparent);
+}
+
+.feature-stage-card {
+  background: color-mix(in srgb, #071017 90%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.025),
+    0 18px 55px rgb(0 8 13 / 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.mobile-safe-action {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.mobile-change-nav {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+@keyframes heroPreviewFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-0.2deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(0.1deg);
+  }
+}
+
 .modal-overlay-in {
   animation: modalOverlayIn 160ms ease-out both;
 }
@@ -735,6 +837,10 @@ input {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hero-preview-float {
+    animation: none;
+  }
+
   .modal-overlay-in,
   .modal-card-in {
     animation: none;

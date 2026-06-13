@@ -44,8 +44,8 @@ const leftImpactDetails = [
 
 const rightImpactDetails = [
   "Serilog.Default changed",
-  "System key added",
-  "Microsoft.Default changed"
+  "Serilog.Override.System changed",
+  "Api.TimeoutSeconds changed"
 ];
 
 const useCases = [
@@ -78,7 +78,7 @@ export default function Page() {
     <main className="flex flex-col">
       <HeroSection />
 
-      <section className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-3 px-10 py-8 sm:grid-cols-4">
+      <section className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-3 px-0 py-6 min-[430px]:grid-cols-2 sm:py-8 lg:grid-cols-4 lg:px-10">
         {trustPoints.map((point) => (
           point.href ? (
             <a
@@ -109,66 +109,117 @@ export default function Page() {
         ))}
       </section>
 
-      <section className="mx-auto w-full max-w-6xl px-10 pb-8">
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="h-px flex-1 bg-[var(--border)]"></div>
-          <div className="flex items-center gap-2.5">
-            <i className="ti ti-git-diff text-[15px] text-cyan-400" aria-hidden="true" />
-            <span className="font-mono text-[12px] text-[var(--muted)] tracking-[0.06em]">
-              47 lines of noise
-            </span>
-            <i className="ti ti-arrow-right text-[14px] text-[var(--muted)] opacity-40" aria-hidden="true" />
-            <span className="font-mono text-[12px] text-cyan-400 tracking-[0.06em]">
-              3 real changes
-            </span>
-          </div>
-          <div className="h-px flex-1 bg-[var(--border)]"></div>
-        </div>
-        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-          <div className="border border-[color-mix(in_srgb,var(--danger)_42%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-5 py-3 text-center font-mono text-[13px] text-[var(--danger)]">
-            <div>appsettings.stg.json vs git diff</div>
-            <div className="mt-2 text-[52px] font-bold leading-none">47</div>
-            <div className="mt-1 text-[11px] text-[var(--muted)]">
-              lines flagged as changed
+      <section className="mx-auto w-full max-w-6xl px-0 pb-8 lg:px-10">
+        <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_76%,transparent)]">
+          <div className="flex flex-col gap-4 border-b border-[var(--border)] px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-7">
+            <div>
+              <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-cyan-400">
+                <i className="ti ti-filter-code" aria-hidden="true" />
+                Signal extraction
+              </div>
+              <h2 className="mt-2 font-sans text-[clamp(1.4rem,3vw,2rem)] font-normal leading-tight tracking-tight text-[var(--text)]">
+                Review the change, not the churn.
+              </h2>
             </div>
-            <div className="mt-3 grid gap-1 text-left">
-              {leftImpactDetails.map((detail) => (
-                <div key={detail.text} className="flex items-center gap-2 font-mono text-[11px] text-[var(--muted)]">
-                  <span className={`h-px w-4 ${detail.color}`} aria-hidden="true" />
-                  <span>{detail.text}</span>
+            <div className="flex items-baseline gap-2 font-mono sm:text-right">
+              <span className="text-[30px] font-bold leading-none text-cyan-400">94%</span>
+              <span className="max-w-24 text-[11px] leading-4 text-[var(--muted)]">
+                less noise to inspect
+              </span>
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-[1fr_136px_1fr]">
+            <article className="relative px-5 py-6 sm:px-7 sm:py-7">
+              <div className="mb-6 flex items-center justify-between gap-4 font-mono text-[11px]">
+                <span className="uppercase tracking-[0.12em] text-[var(--danger)]">Standard git diff</span>
+                <span className="truncate text-[var(--muted)]">appsettings.stg.json</span>
+              </div>
+
+              <div className="flex items-end gap-4">
+                <div className="font-mono text-[clamp(4.5rem,12vw,7rem)] font-bold leading-[0.75] tracking-[-0.08em] text-[var(--danger)]">
+                  47
                 </div>
-              ))}
-            </div>
-          </div>
-          <div className="font-mono text-[18px] text-[var(--muted)]" aria-hidden="true">
-            <span className="sm:hidden">↓</span>
-            <span className="hidden sm:inline">→</span>
-          </div>
-          <div className="border border-[color-mix(in_srgb,var(--ok)_42%,transparent)] bg-[color-mix(in_srgb,var(--ok)_10%,transparent)] px-5 py-3 text-center font-mono text-[13px] text-[var(--ok)]">
-            <div>appsettings.stg.json in DiffViewr</div>
-            <div className="mt-2 text-[52px] font-bold leading-none">3</div>
-            <div className="mt-1 text-[11px] text-[var(--muted)]">
-              real value differences
-            </div>
-            <div className="mt-3 grid gap-1 text-left">
-              {rightImpactDetails.map((detail) => (
-                <div key={detail} className="flex items-center gap-2 font-mono text-[11px] text-[var(--muted)]">
-                  <span className="h-px w-4 bg-[var(--ok)]" aria-hidden="true" />
-                  <span>{detail}</span>
+                <div className="pb-1 font-mono text-[11px] leading-4 text-[var(--muted)]">
+                  lines flagged
+                  <br />
+                  as changed
                 </div>
-              ))}
+              </div>
+
+              <div className="mt-7 grid gap-2">
+                {leftImpactDetails.map((detail) => (
+                  <div
+                    key={detail.text}
+                    className="flex items-center gap-3 border-l border-[color-mix(in_srgb,var(--danger)_38%,transparent)] bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] px-3 py-2 font-mono text-[11px] text-[var(--muted)]"
+                  >
+                    <span className={`h-1.5 w-1.5 ${detail.color}`} aria-hidden="true" />
+                    <span>{detail.text}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <div className="relative flex min-h-24 items-center justify-center border-y border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_52%,transparent)] lg:min-h-0 lg:border-x lg:border-y-0">
+              <div className="absolute left-6 right-6 top-1/2 h-px bg-[var(--border)] lg:bottom-7 lg:left-1/2 lg:right-auto lg:top-7 lg:h-auto lg:w-px" />
+              <div className="relative flex items-center gap-3 rounded-full border border-cyan-400/30 bg-[var(--bg)] px-4 py-2 font-mono text-[11px] text-cyan-400 shadow-[0_0_28px_rgba(34,211,238,0.12)] lg:flex-col lg:gap-1.5 lg:px-3">
+                <i className="ti ti-adjustments-horizontal text-[17px]" aria-hidden="true" />
+                <span>normalize</span>
+                <i className="ti ti-arrow-right text-[14px] lg:rotate-90" aria-hidden="true" />
+              </div>
             </div>
+
+            <article className="relative bg-[linear-gradient(135deg,color-mix(in_srgb,var(--ok)_8%,transparent),transparent_58%)] px-5 py-6 sm:px-7 sm:py-7">
+              <div className="mb-6 flex items-center justify-between gap-4 font-mono text-[11px]">
+                <span className="uppercase tracking-[0.12em] text-[var(--ok)]">DiffViewr result</span>
+                <span className="flex items-center gap-1.5 text-[var(--ok)]">
+                  <i className="ti ti-circle-check-filled" aria-hidden="true" />
+                  review ready
+                </span>
+              </div>
+
+              <div className="flex items-end gap-4">
+                <div className="font-mono text-[clamp(4.5rem,12vw,7rem)] font-bold leading-[0.75] tracking-[-0.08em] text-[var(--ok)]">
+                  3
+                </div>
+                <div className="pb-1 font-mono text-[11px] leading-4 text-[var(--muted)]">
+                  real value
+                  <br />
+                  differences
+                </div>
+              </div>
+
+              <div className="mt-7 grid gap-2">
+                {rightImpactDetails.map((detail) => (
+                  <div
+                    key={detail}
+                    className="flex items-center gap-3 border-l border-[color-mix(in_srgb,var(--ok)_42%,transparent)] bg-[color-mix(in_srgb,var(--ok)_7%,transparent)] px-3 py-2 font-mono text-[11px] text-[var(--text)]"
+                  >
+                    <i className="ti ti-check text-[13px] text-[var(--ok)]" aria-hidden="true" />
+                    <span>{detail}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
           </div>
-        </div>
-        <div className="mt-4 text-center">
-          <Link href="/tool?sample=1" className="font-mono text-[12px] text-cyan-400">
-            See this example in the tool →
-          </Link>
+
+          <div className="flex justify-center border-t border-[var(--border)] px-5 py-4">
+            <Link
+              href="/tool?sample=1"
+              className="inline-flex min-h-11 items-center justify-center gap-2 font-mono text-[12px] text-cyan-400 transition hover:text-cyan-300"
+            >
+              See this example in the tool
+              <i className="ti ti-arrow-right text-[14px]" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </section>
 
-      <section id="features" className="mx-auto w-full max-w-6xl px-10 py-12">
-        <div className="mb-7 max-w-3xl">
+      <section id="features" className="feature-stage relative -mx-4 overflow-hidden border-y border-[var(--border)] sm:-mx-6 lg:-mx-10">
+        <div className="feature-stage-grid absolute inset-0" aria-hidden="true" />
+
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 sm:py-16 lg:px-10 lg:py-20">
+        <div className="mb-9 max-w-3xl">
           <p className="font-mono text-[12px] uppercase tracking-[1.8px] text-cyan-400">
             Template · Target · diff
           </p>
@@ -176,12 +227,12 @@ export default function Page() {
             The only diff tool that treats one file as the source of truth.
           </h2>
           <p className="mt-4 max-w-2xl font-sans text-[16px] font-normal leading-relaxed tracking-normal text-[var(--muted)]">
-            Most tools treat both sides equally. DiffViewr treats Template A as the reference — your target config is aligned to it, not just compared against it.
+            Most tools treat both sides equally. DiffViewr treats Template A as the reference, so your target config is aligned to it before comparison.
           </p>
         </div>
 
         <div className="grid auto-rows-[minmax(210px,auto)] gap-4 lg:grid-cols-4">
-          <article className="group flex flex-col gap-4 self-start overflow-hidden rounded-lg border border-[var(--border)] bg-[#071017] p-4 text-white transition duration-300 hover:border-cyan-400/40 lg:col-span-2">
+          <article className="feature-stage-card group flex flex-col gap-4 self-start overflow-hidden rounded-lg border border-[var(--border)] p-4 text-white transition duration-300 hover:border-cyan-400/40 lg:col-span-2">
             <h3 className="font-sans text-[15px] font-medium leading-snug tracking-[-0.01em] text-white">
               Template-aligned comparison
             </h3>
@@ -209,7 +260,7 @@ export default function Page() {
               </div>
           </article>
 
-          <article className="group rounded-lg border border-[var(--border)] bg-[#071017] p-5 text-white transition duration-300 hover:border-cyan-400/40 lg:col-span-2">
+          <article className="feature-stage-card group rounded-lg border border-[var(--border)] p-5 text-white transition duration-300 hover:border-cyan-400/40 lg:col-span-2">
             <h3 className="font-sans text-[15px] font-medium leading-snug tracking-[-0.01em] text-white">
               Visual compare preview
             </h3>
@@ -230,7 +281,7 @@ export default function Page() {
             </div>
           </article>
 
-          <article className="group rounded-lg border border-[var(--border)] bg-[#071017] p-5 text-white transition duration-300 hover:border-cyan-400/40">
+          <article className="feature-stage-card group rounded-lg border border-[var(--border)] p-5 text-white transition duration-300 hover:border-cyan-400/40">
             <h3 className="font-sans text-[15px] font-medium leading-snug tracking-[-0.01em] text-white">
               Format detection
             </h3>
@@ -246,7 +297,7 @@ export default function Page() {
             </div>
           </article>
 
-          <article className="group lg:col-span-3 rounded-lg border border-[var(--border)] bg-[#071017] p-5 text-white transition duration-300 hover:border-cyan-400/40">
+          <article className="feature-stage-card group rounded-lg border border-[var(--border)] p-5 text-white transition duration-300 hover:border-cyan-400/40 lg:col-span-3">
             <h3 className="font-sans text-[15px] font-medium leading-snug tracking-[-0.01em] text-white">
               Export clean, reordered config
             </h3>
@@ -263,9 +314,10 @@ export default function Page() {
             </div>
           </article>
         </div>
+        </div>
       </section>
 
-      <section className="mx-auto w-full max-w-6xl px-10 py-12">
+      <section className="mx-auto w-full max-w-6xl px-0 py-10 sm:py-12 lg:px-10">
         <div className="border-t border-[var(--border)] py-10">
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
             <div>
@@ -293,7 +345,7 @@ export default function Page() {
             </p>
             <Link
               href="/tool/"
-              className="inline-flex items-center gap-2 rounded-lg bg-cyan-400 px-6 py-3 font-sans text-[15px] font-medium text-[#0c0e11] transition hover:opacity-90"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-6 py-3 font-sans text-[15px] font-medium text-[#0c0e11] transition hover:opacity-90 sm:w-auto"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path

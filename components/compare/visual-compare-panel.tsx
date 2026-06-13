@@ -636,6 +636,7 @@ function renderAligned(
 }
 
 export function VisualComparePanel({ result }: { result: CompareResult }) {
+  const [mobilePane, setMobilePane] = useState<"a" | "b">("a");
   const { aMap, bMap } = useMemo(() => buildKindMaps(result.root), [result.root]);
   const aligned = useMemo(() => {
     const lines: LinePair[] = [];
@@ -864,14 +865,40 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
         activeFilters={activeFilterSet}
         onToggleFilter={toggleFilter}
       />
+      <div className="grid grid-cols-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1 md:hidden">
+        <button
+          type="button"
+          className={`min-h-11 rounded-md px-3 font-mono text-[12px] font-medium transition-colors ${
+            mobilePane === "a"
+              ? "bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] text-[var(--text)]"
+              : "text-[var(--muted)]"
+          }`}
+          aria-pressed={mobilePane === "a"}
+          onClick={() => setMobilePane("a")}
+        >
+          Template A
+        </button>
+        <button
+          type="button"
+          className={`min-h-11 rounded-md px-3 font-mono text-[12px] font-medium transition-colors ${
+            mobilePane === "b"
+              ? "bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] text-[var(--text)]"
+              : "text-[var(--muted)]"
+          }`}
+          aria-pressed={mobilePane === "b"}
+          onClick={() => setMobilePane("b")}
+        >
+          Aligned B
+        </button>
+      </div>
       <div
         ref={scrollRef}
-        className={`rounded-xl border border-[var(--border)] relative w-full overflow-visible ${
+        className={`relative w-full overflow-hidden rounded-xl border border-[var(--border)] md:overflow-visible ${
           changeLineIndices.length > 0 ? "pb-20" : ""
         }`}
       >
-        <div className="flex gap-3 min-w-[820px]">
-          <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="flex min-w-0 gap-0 md:min-w-[820px] md:gap-3">
+          <div className={`${mobilePane === "a" ? "block" : "hidden"} min-w-0 flex-1 overflow-x-auto md:block md:overflow-hidden`}>
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
               Template (A)
             </div>
@@ -888,7 +915,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
                   <div
                     key={`a-${idx}`}
                     ref={(el) => {
-                      rowRefs.current[idx] = el;
+                      if (mobilePane === "a") rowRefs.current[idx] = el;
                     }}
                     className={`${kindClass(inferred)} json-editor-line ${isActive ? "json-line-active" : ""}`}
                   >
@@ -901,7 +928,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
               })}
             </div>
 </div>
-          <div className="flex-1 min-w-0 overflow-hidden">
+          <div className={`${mobilePane === "b" ? "block" : "hidden"} min-w-0 flex-1 overflow-x-auto md:block md:overflow-hidden`}>
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
               Aligned (B)
             </div>
@@ -915,7 +942,13 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
                     : undefined;
                 const isActive = activeLine === idx;
                 return (
-                  <div key={`b-${idx}`} className={`${kindClass(inferred)} json-editor-line ${isActive ? "json-line-active" : ""}`}>
+                  <div
+                    key={`b-${idx}`}
+                    ref={(el) => {
+                      if (mobilePane === "b") rowRefs.current[idx] = el;
+                    }}
+                    className={`${kindClass(inferred)} json-editor-line ${isActive ? "json-line-active" : ""}`}
+                  >
                     <span className="json-lineno" aria-hidden="true">
                       {idx + 1}
                     </span>
@@ -928,10 +961,10 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
          </div>
 
        {changeLineIndices.length > 0 && (
-         <div className="fixed bottom-6 left-1/2 z-30 flex w-fit -translate-x-1/2 items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[var(--panel)] px-0.5 py-1 shadow-[0_4px_12px_rgba(0,0,0,0.28)]">
+         <div className="mobile-change-nav fixed bottom-3 left-1/2 z-30 flex w-[calc(100%_-_2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[var(--panel)] px-0.5 py-1 shadow-[0_4px_12px_rgba(0,0,0,0.28)] sm:bottom-6 sm:w-fit sm:max-w-none">
            <button
              type="button"
-             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--muted)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--text)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+             className="flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--muted)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--text)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
              onClick={() => goToChange(activeChangePos - 1)}
              disabled={activeChangePos <= 0}
              aria-label="Previous change"
@@ -943,7 +976,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
            </span>
            <button
              type="button"
-             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--text)] font-medium hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+             className="flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--text)] font-medium hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
              onClick={() => goToChange(activeChangePos + 1)}
              disabled={activeChangePos >= changeLineIndices.length - 1}
              aria-label="Next change"

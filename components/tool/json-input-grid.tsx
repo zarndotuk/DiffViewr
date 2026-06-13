@@ -71,7 +71,7 @@ function ConfigInputPanel({
   return (
     <section className={panelClass}>
       <div className="panel-wrapper rounded-xl border border-[var(--border)] focus-within:outline-none">
-        <div className="flex items-center justify-between px-3 py-2 bg-[var(--panel)] border-b border-[var(--border)] rounded-t-xl">
+        <div className="flex min-h-12 items-center justify-between gap-2 rounded-t-xl border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2">
           <div className="flex min-w-0 items-center gap-2">
             <span className={sideBadgeClass}>{side}</span>
             <label htmlFor={id} className="font-mono text-[12px] font-medium text-[var(--text)]">
@@ -81,7 +81,7 @@ function ConfigInputPanel({
               {subLabel}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <span className={detection.isDetecting ? "opacity-70" : undefined}>
               <FormatBadge format={detection.format} />
             </span>
@@ -90,7 +90,7 @@ function ConfigInputPanel({
         </div>
 
         {collapsed ? (
-          <div className="text-[14px] text-[var(--muted)]">
+          <div className="p-3 text-[14px] text-[var(--muted)]">
             Collapsed. {collapsedLabel} has <strong>{value.length.toLocaleString()}</strong>{" "}
             characters.
           </div>
@@ -178,7 +178,7 @@ export function JsonInputGrid({
   const collapsed = isOutputVisible && inputsCollapsed;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-8">
       <ConfigInputPanel
         panelClass={panelClass}
         inputClass={inputClass}

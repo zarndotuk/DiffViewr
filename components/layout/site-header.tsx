@@ -58,9 +58,9 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 h-16 border-b border-[rgba(255,255,255,0.05)] bg-[#080d12]/90 backdrop-blur">
-      <div className="mx-auto flex h-16 w-full max-w-screen items-center justify-between gap-4 px-6 sm:px-10">
+      <div className="mx-auto flex h-16 w-full max-w-screen items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6 lg:px-10">
         <div className="flex items-center gap-3">
-          <Link href="/" onClick={handleLogoClick} className="inline-flex items-center gap-2 no-underline">
+          <Link href="/" onClick={handleLogoClick} className="inline-flex items-center no-underline">
             <img
               src="/brand/diffviewr-mark.svg"
               alt="DiffViewr"
@@ -68,7 +68,7 @@ export function SiteHeader() {
               height={28}
               className="h-7 w-7"
             />
-            <span className="font-sans text-[16px] font-medium tracking-[-0.2px] text-[var(--text)]">
+            <span className="hidden font-sans text-[16px] font-medium tracking-[-0.2px] text-[var(--text)] min-[360px]:inline">
               DiffViewr
             </span>
           </Link>
@@ -86,7 +86,8 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <Link
             href="/tool/"
-            className="inline-flex items-center gap-2 rounded-lg bg-cyan-400 px-5 py-3 font-sans text-[15px] font-medium text-[#0c0e11] transition hover:opacity-90"
+            aria-label="Start diffing"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 font-sans text-[14px] font-medium text-[#0c0e11] transition hover:opacity-90 sm:px-5 sm:text-[15px]"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path
@@ -97,7 +98,7 @@ export function SiteHeader() {
                 strokeLinejoin="round"
               />
             </svg>
-            Start diffing
+            <span className="hidden min-[390px]:inline">Start diffing</span>
           </Link>
           <details
             ref={mobileRef}
@@ -106,8 +107,8 @@ export function SiteHeader() {
               if (mobileRef.current?.open) closeOtherMenus(mobileRef);
             }}
           >
-            <summary className="site-menu-trigger">Menu</summary>
-            <div className="site-menu-panel" role="menu">
+            <summary className="site-menu-trigger min-h-11">Menu</summary>
+            <div className="site-menu-panel left-auto right-0" role="menu">
               <a
                 className="site-menu-item"
                 href={REPO_URL}

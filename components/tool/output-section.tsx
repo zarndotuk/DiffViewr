@@ -156,9 +156,9 @@ export function OutputSection({
     "inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent font-sans text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-60";
 
   return (
-    <section className={`${panelClass} mt-4`}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border)]">
-        <div className="flex flex-wrap gap-1">
+    <section className={`${panelClass} mt-2 sm:mt-4`}>
+      <div className="mb-3 flex flex-col gap-3 border-b border-[var(--border)] sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+        <div className="grid grid-cols-2 gap-1 sm:flex sm:flex-wrap">
           <button
             className={activeTab === "compare" ? activeTabClass : inactiveTabClass}
             onClick={() => setActiveTab("compare")}
@@ -174,7 +174,7 @@ export function OutputSection({
             Reordered Result
           </button>
         </div>
-        <div className="flex items-center gap-2 pb-2">
+        <div className="grid grid-cols-2 items-center gap-2 pb-3 sm:flex sm:pb-2">
           <button className={ghostActionClass} onClick={onStartAgain} type="button">
             <svg
               aria-hidden="true"
@@ -215,7 +215,7 @@ export function OutputSection({
             This is <strong>B</strong> with only the <strong>key order</strong> adjusted to match{" "}
             <strong>A</strong> (diff-friendly). Values are unchanged.
           </div>
-<div className="json-view border border-[var(--border)] font-mono text-[14px] leading-relaxed p-3 rounded-xl"
+              <div className="json-view overflow-x-auto border border-[var(--border)] font-mono text-[13px] leading-relaxed p-3 rounded-xl sm:text-[14px]"
                style={getContainerStyles()}>
              {resultText ? resultText.split('\n').map((line, i) => (
                <div key={i} className="json-editor-line">

@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import posthog from "posthog-js";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { detectIndentFromText, stringifyLikeInput } from "@/lib/stringifyLikeInput";
@@ -163,6 +164,23 @@ export default function Page() {
     document.cookie = `diffviewr_rating=${value}; max-age=${maxAge}; path=/; samesite=lax`;
   }
 
+  function submitRating() {
+    if (rating <= 0) return;
+
+    posthog.capture("visual_compare_rating_submitted", {
+      rating,
+      reorder_arrays: reorderArrays,
+      missing_in_b: compare?.summary.missingInB ?? 0,
+      extra_in_b: compare?.summary.extraInB ?? 0,
+      changed_values: compare?.summary.changedValues ?? 0,
+      type_mismatches: compare?.summary.typeMismatches ?? 0
+    });
+
+    setRatingCookie(rating);
+    setHasRated(true);
+    setShowFeedbackPrompt(false);
+  }
+
   function clearMessages() {
     setError("");
     setStatus("");
@@ -283,40 +301,133 @@ export default function Page() {
   }
 
 const SAMPLE = {
-  path: "$.items",
-  matchField: "id",
   reference: {
-    items: [
-      { id: "a", name: "Alpha", meta: { code: 10 } },
-      { id: "b", name: "Beta", meta: { code: 20 } },
-      { id: "c", name: "Gamma", meta: { code: 30 } }
-    ],
-    settings: { featureX: true, retries: 2 }
+    Service: "Checkout",
+    Logging: {
+      LogLevel: {
+        Default: "Information",
+        Microsoft: "Warning",
+        System: "Warning"
+      }
+    },
+    AllowedHosts: "*",
+    ConnectionStrings: {
+      Main: "Server=db-stg;Database=App;"
+    },
+    Features: {
+      EnableCheckout: true,
+      EnableAudit: true,
+      EnableBeta: false
+    },
+    Cache: {
+      Provider: "Redis",
+      TtlSeconds: 300
+    },
+    Api: {
+      BaseUrl: "https://api.example.com",
+      TimeoutSeconds: 30,
+      Retries: 3
+    },
+    Serilog: {
+      MinimumLevel: {
+        Default: "Information",
+        Override: {
+          Microsoft: "Warning",
+          System: "Warning"
+        }
+      },
+      WriteTo: ["Console"]
+    },
+    HealthChecks: {
+      Enabled: true,
+      Path: "/health"
+    },
+    Telemetry: {
+      Enabled: true,
+      SampleRate: 0.25
+    },
+    Deployment: {
+      Region: "us-east-1",
+      Environment: "staging",
+      Slot: "blue",
+      Replicas: 2,
+      RollingUpdate: true,
+      MaxUnavailable: 1,
+      MaxSurge: 1,
+      DrainSeconds: 30
+    }
   },
   target: {
-    items: [
-      { id: "c", name: "Gamma", meta: { code: 30 } },
-      { id: "x", name: "Extra", meta: { code: 999 } },
-      { id: "a", name: "Alpha", meta: { code: 10 } },
-      { id: "b", name: "Beta", meta: { code: 20 } }
-    ],
-    settings: { retries: 2, featureX: true }
+    Deployment: {
+      DrainSeconds: 30,
+      MaxSurge: 1,
+      MaxUnavailable: 1,
+      RollingUpdate: true,
+      Replicas: 2,
+      Slot: "blue",
+      Environment: "staging",
+      Region: "us-east-1"
+    },
+    Telemetry: {
+      SampleRate: 0.25,
+      Enabled: true
+    },
+    HealthChecks: {
+      Path: "/health",
+      Enabled: true
+    },
+    Serilog: {
+      WriteTo: ["Console"],
+      MinimumLevel: {
+        Override: {
+          System: "Error",
+          Microsoft: "Warning"
+        },
+        Default: "Debug"
+      }
+    },
+    Api: {
+      Retries: 3,
+      TimeoutSeconds: 45,
+      BaseUrl: "https://api.example.com"
+    },
+    Cache: {
+      TtlSeconds: 300,
+      Provider: "Redis"
+    },
+    Features: {
+      EnableBeta: false,
+      EnableAudit: true,
+      EnableCheckout: true
+    },
+    ConnectionStrings: {
+      Main: "Server=db-stg;Database=App;"
+    },
+    AllowedHosts: "*",
+    Logging: {
+      LogLevel: {
+        System: "Warning",
+        Microsoft: "Warning",
+        Default: "Information"
+      }
+    },
+    Service: "Checkout"
   }
 } as const;
 
-const panelClass = "p-8";
+const panelClass = "p-4 sm:p-6 lg:p-8";
 const inputClass =
-  "w-full rounded-xl border-0 bg-[var(--panel)] text-[var(--text)] font-mono text-[14px] leading-relaxed p-3 focus:outline-none";
+  "w-full rounded-xl border-0 bg-[var(--panel)] text-[var(--text)] font-mono text-[16px] sm:text-[14px] leading-relaxed p-3 focus:outline-none";
 const jsonInputSizeClass =
   isOutputVisible
     ? "min-h-[160px] max-h-[220px]"
-    : "min-h-[520px]";
+    : "min-h-[300px] sm:min-h-[380px] lg:min-h-[520px]";
 const buttonBase =
   "cyberpunk-button px-3 py-2 rounded-lg font-sans text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d4aa] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
 const buttonPrimary =
   "cyberpunk-button primary px-3 py-2 rounded-lg font-sans text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d4aa] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
   const ctaButton =
-    "inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-5 py-3 font-sans text-[15px] font-medium text-[var(--muted)] " +
+    "inline-flex min-h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-5 py-3 font-sans text-[15px] font-medium text-[var(--muted)] " +
     "cursor-not-allowed transition-colors duration-200 enabled:cursor-pointer enabled:border-transparent enabled:bg-cyan-400 enabled:text-[#0c0e11] " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d4aa] " +
     "focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
@@ -324,7 +435,7 @@ const buttonPrimary =
   return (
     <Suspense fallback={null}>
       <SearchParamsInit onLoadSample={onLoadSample}>
-        <main id="main" className="py-4 flex flex-col">
+        <main id="main" className="flex flex-col py-2 sm:py-4">
       <a
         href="#results"
         className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-[var(--panel)] focus:px-3 focus:py-2 focus:text-sm focus:text-[var(--text)] focus:shadow-[var(--shadow)]"
@@ -337,10 +448,10 @@ const buttonPrimary =
       {!isResultsOnly && (
         <>
           {/* Tool Section - full width */}
-          <div className="w-full bg-[var(--bg)] px-4 sm:px-6 lg:px-10">
+          <div className="w-full bg-[var(--bg)] px-0 sm:px-2 lg:px-10">
             {/* Visual Anchor */}
             <div id="tool-input">
-              <div className="flex items-start justify-between gap-4 px-4 py-3 border-b border-[var(--border)] bg-[var(--panel)] mb-0">
+              <div className="mb-0 flex flex-col items-start justify-between gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-3 py-3 sm:flex-row sm:gap-4 sm:px-4">
                 <div className="flex min-w-0 flex-col gap-1">
                   <div className="contents">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
@@ -353,12 +464,13 @@ const buttonPrimary =
                   </p>
                     </div>
                     <p className="font-mono text-[11px] leading-none text-[var(--muted)] opacity-80">
-                      Tip: Ctrl+Enter / Cmd+Enter to compare
+                      <span className="hidden sm:inline">Tip: Ctrl+Enter / Cmd+Enter to compare</span>
+                      <span className="sm:hidden">Paste both configs, then compare below</span>
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-2">
+                <div className="flex w-full items-center gap-2 sm:w-auto">
+                  <div className="flex flex-wrap gap-2">
                     {["JSON", "YAML", ".ENV"].map((format) => (
                       <span
                         key={format}
@@ -372,7 +484,7 @@ const buttonPrimary =
               </div>
             </div>
 
-            <div className="mt-8">
+            <div className="mt-4 sm:mt-6 lg:mt-8">
               <JsonInputGrid
                 panelClass=""
                 inputClass={inputClass}
@@ -401,7 +513,7 @@ const buttonPrimary =
 
           {/* Results Section - full width */}
           <div className="w-full">
-            <section id="results" ref={resultSectionRef} className="px-4 sm:px-6 lg:px-10 mt-4">
+            <section id="results" ref={resultSectionRef} className="mt-4 px-0 sm:px-2 lg:px-10">
               <div className="flex flex-col items-center gap-6">
                 {bothHaveContent ? (
                   <label className="flex items-center gap-2 text-sm text-[var(--muted)] cyberpunk-checkbox-label">
@@ -419,7 +531,7 @@ const buttonPrimary =
                   </label>
                 ) : null}
               </div>
-              <div className="sticky bottom-0 z-20 bg-[color-mix(in_srgb,var(--bg)_92%,transparent)] backdrop-blur-sm px-6 py-3 flex items-center justify-between gap-4">
+              <div className="mobile-safe-action sticky bottom-0 z-20 flex items-center justify-between gap-4 bg-[color-mix(in_srgb,var(--bg)_92%,transparent)] px-0 py-3 backdrop-blur-sm sm:px-6">
                 <div className="w-32 hidden sm:block" />
                 <button
                   className={ctaButton}
@@ -460,7 +572,7 @@ const buttonPrimary =
 
       {isResultsOnly && (
         <div className="w-full">
-          <section id="results" ref={resultSectionRef} className="px-4 sm:px-6 lg:px-10 mt-4">
+          <section id="results" ref={resultSectionRef} className="mt-2 px-0 sm:mt-4 sm:px-2 lg:px-10">
             <OutputSection
               panelClass={panelClass}
               inputClass={inputClass}
@@ -477,13 +589,7 @@ const buttonPrimary =
               rating={rating}
               onRate={setRating}
               onDismissFeedback={() => setShowFeedbackPrompt(false)}
-              onSubmitFeedback={() => {
-                if (rating > 0) {
-                  setRatingCookie(rating);
-                  setHasRated(true);
-                }
-                setShowFeedbackPrompt(false);
-              }}
+              onSubmitFeedback={submitRating}
             />
           </section>
         </div>

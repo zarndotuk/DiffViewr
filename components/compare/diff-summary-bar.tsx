@@ -33,17 +33,17 @@ export function DiffSummaryBar({
   const stats = allStats.filter((stat) => stat.count > 0);
 
   return (
-    <div className="flex flex-wrap items-center gap-4 py-3">
+    <div className="flex flex-wrap items-center gap-3 py-3 sm:gap-4">
       <ReorderBadge />
       {stats.length ? <div className="h-3 w-px bg-[var(--border)]" /> : null}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         {stats.map((stat) => {
           const isActive = activeFilters.has(stat.kind);
           return (
             <button
               key={stat.kind}
               type="button"
-              className={`inline-flex items-center gap-2 font-mono text-[12px] transition-colors ${
+              className={`inline-flex min-h-9 items-center gap-2 font-mono text-[11px] transition-colors sm:text-[12px] ${
                 isActive ? "text-[var(--text)]" : "text-[var(--muted)]"
               }`}
               onClick={() => onToggleFilter(stat.kind)}

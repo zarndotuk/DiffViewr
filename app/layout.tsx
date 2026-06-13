@@ -6,6 +6,7 @@ import {
 import "./globals.css";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { PostHogProvider } from "./providers";
 
 const sansFont = Geist({
   subsets: ["latin"],
@@ -54,13 +55,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         className="flex min-h-screen w-full flex-col bg-[var(--bg)] text-[var(--text)]"
         suppressHydrationWarning
       >
-        <SiteHeader />
-        <div className="relative isolate flex flex-1 flex-col overflow-hidden bg-[var(--bg)]">
-          <div className="relative z-10 mx-auto flex w-full flex-1 flex-col px-10">
-            {children}
-            <SiteFooter />
+        <PostHogProvider>
+          <SiteHeader />
+          <div className="relative isolate flex flex-1 flex-col overflow-hidden bg-[var(--bg)]">
+            <div className="relative z-10 mx-auto flex w-full flex-1 flex-col px-4 sm:px-6 lg:px-10">
+              {children}
+              <SiteFooter />
+            </div>
           </div>
-        </div>
+        </PostHogProvider>
       </body>
     </html>
   );

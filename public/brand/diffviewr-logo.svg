@@ -1,66 +1,19 @@
-<svg width="680" height="260" viewBox="0 0 680 260" role="img" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="260" viewBox="0 0 680 260" fill="none">
   <title>DiffViewr logo</title>
-  <desc>DiffViewr logo with purple curly brace icon and wordmark</desc>
-
-  <defs>
-    <linearGradient id="bgCard" x1="0" y1="0" x2="680" y2="260" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#0C0F1A"/>
-      <stop offset="100%" stop-color="#080B14"/>
-    </linearGradient>
-    <linearGradient id="accentY" x1="0" y1="0" x2="0" y2="140" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#E8FF47"/>
-      <stop offset="100%" stop-color="#C4D900"/>
-    </linearGradient>
-    <linearGradient id="purpleL" x1="0" y1="0" x2="0" y2="140" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#C490FF"/>
-      <stop offset="100%" stop-color="#7C3FD4"/>
-    </linearGradient>
-    <linearGradient id="purpleR" x1="0" y1="0" x2="0" y2="140" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#C490FF"/>
-      <stop offset="100%" stop-color="#7C3FD4"/>
-    </linearGradient>
-  </defs>
-
-  <rect width="680" height="260" rx="20" fill="url(#bgCard)"/>
-  <rect x="1" y="1" width="678" height="258" rx="19" fill="none" stroke="#3A1F6A" stroke-width="1.5"/>
-  <rect x="2" y="2" width="676" height="256" rx="18" fill="none" stroke="#6B2FC0" stroke-width="0.5" opacity="0.25"/>
-
-  <!-- Icon background -->
-  <rect x="55" y="50" width="150" height="160" rx="18" fill="#0F1220" stroke="#2A2050" stroke-width="1.2"/>
-  <rect x="56" y="51" width="148" height="158" rx="17" fill="none" stroke="#6B2FC0" stroke-width="0.4" opacity="0.4"/>
-
-  <!-- Left brace -->
-  <path d="M117 74 C108 74 104 79 104 87 L104 104 C104 111 100 114 97 116 C100 118 104 121 104 128 L104 145 C104 153 108 158 117 158"
-        stroke="url(#purpleL)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-
-  <!-- Right brace -->
-  <path d="M143 74 C152 74 156 79 156 87 L156 104 C156 111 160 114 163 116 C160 118 156 121 156 128 L156 145 C156 153 152 158 143 158"
-        stroke="url(#purpleR)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-
-  <!-- Yellow divider -->
-  <line x1="130" y1="76" x2="130" y2="156" stroke="url(#accentY)" stroke-width="4.5" stroke-linecap="round"/>
-
-  <!-- Diff ticks -->
-  <line x1="124" y1="100" x2="136" y2="100" stroke="#E8FF47" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
-  <line x1="124" y1="132" x2="136" y2="132" stroke="#E8FF47" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
-
-  <!-- Wordmark -->
-  <text x="242" y="105" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="15" font-weight="400" fill="#5A4A8A" letter-spacing="2.5">DEVELOPER TOOL</text>
-  <line x1="242" y1="111" x2="400" y2="111" stroke="#3A1F6A" stroke-width="1"/>
-
-  <text x="240" y="152" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="62" font-weight="700" letter-spacing="-2" fill="#EEF1FF">Diff</text>
-  <text x="390" y="152" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="62" font-weight="700" letter-spacing="-2" fill="#E8FF47">Viewr</text>
-
-  <text x="242" y="183" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="14" font-weight="400" fill="#5A6890" letter-spacing="1">JSON · YAML · ENV  diff tool</text>
-
-  <!-- Decorative lines -->
-  <line x1="610" y1="60" x2="650" y2="60" stroke="#1E2440" stroke-width="1" stroke-linecap="round"/>
-  <line x1="600" y1="72" x2="650" y2="72" stroke="#1E2440" stroke-width="1" stroke-linecap="round"/>
-  <line x1="620" y1="84" x2="650" y2="84" stroke="#1E2440" stroke-width="1" stroke-linecap="round"/>
-  <line x1="610" y1="176" x2="650" y2="176" stroke="#1E2440" stroke-width="1" stroke-linecap="round"/>
-  <line x1="600" y1="188" x2="650" y2="188" stroke="#1E2440" stroke-width="1" stroke-linecap="round"/>
-  <line x1="620" y1="200" x2="650" y2="200" stroke="#1E2440" stroke-width="1" stroke-linecap="round"/>
-  <circle cx="605" cy="128" r="3" fill="#E8FF47" opacity="0.5"/>
-  <circle cx="617" cy="128" r="2" fill="#7C3FD4" opacity="0.5"/>
-  <circle cx="627" cy="128" r="2" fill="#7C3FD4" opacity="0.3"/>
+  <rect width="680" height="260" rx="24" fill="#080D12"/>
+  <rect x=".75" y=".75" width="678.5" height="258.5" rx="23.25" stroke="#20343D" stroke-width="1.5"/>
+  <g transform="translate(42 34) scale(.75)">
+    <rect width="256" height="256" rx="60" fill="#081017"/>
+    <rect x=".75" y=".75" width="254.5" height="254.5" rx="59.25" stroke="#294550" stroke-width="1.5"/>
+    <path d="M106 62H80C68.954 62 60 70.954 60 82V174C60 185.046 68.954 194 80 194H106" stroke="#EDF9FB" stroke-width="14" stroke-linecap="round"/>
+    <path d="M150 62H176C187.046 62 196 70.954 196 82V174C196 185.046 187.046 194 176 194H150" stroke="#EDF9FB" stroke-width="14" stroke-linecap="round"/>
+    <path d="M96 94H154" stroke="#30CFD0" stroke-width="12" stroke-linecap="round"/>
+    <path d="M110 128H168" stroke="#30CFD0" stroke-width="12" stroke-linecap="round"/>
+    <path d="M88 162H146" stroke="#30CFD0" stroke-width="12" stroke-linecap="round"/>
+  </g>
+  <text x="258" y="104" fill="#71808C" font-size="13" font-weight="500" letter-spacing="2.6" font-family="JetBrains Mono, Consolas, monospace">CONFIG DIFF TOOL</text>
+  <text x="254" y="158" fill="#EDF9FB" font-size="62" font-weight="650" letter-spacing="-2.5" font-family="Geist, Arial, sans-serif">DiffViewr</text>
+  <path d="M258 184H592" stroke="#20343D"/>
+  <text x="258" y="211" fill="#82919C" font-size="13" letter-spacing=".5" font-family="JetBrains Mono, Consolas, monospace">JSON · YAML · ENV</text>
+  <path d="M548 211H592" stroke="#30CFD0" stroke-width="3" stroke-linecap="round"/>
 </svg>
