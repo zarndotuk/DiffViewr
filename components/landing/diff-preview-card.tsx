@@ -184,29 +184,29 @@ export function DiffPreviewCard() {
       role="img"
       aria-label="DiffViewr showing a minimal side-by-side JSON comparison preview"
     >
-      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_84%,var(--bg))] px-4 py-2.5">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_84%,var(--bg))] px-3 py-2.5 sm:px-4">
         <div className="flex gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
         </div>
-        <span className="font-mono text-[11px] text-[var(--text)]">DiffViewr / visual compare</span>
+        <span className="truncate font-mono text-[10px] text-[var(--text)] sm:text-[11px]">DiffViewr / visual compare</span>
         <span className="flex items-center gap-1.5 font-mono text-[10px] text-emerald-300">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
           local
         </span>
       </div>
 
-      <div className="flex divide-x divide-[var(--border)]">
+      <div className="flex min-w-0 divide-x divide-[var(--border)]">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[var(--bg)] border-b border-[var(--border)]">
-            <span className="font-mono text-[10px] font-semibold text-[var(--text)] uppercase tracking-wide">Template (A)</span>
-            <span className="font-mono text-[10px] text-[var(--muted)] truncate">appsettings.tpl.json</span>
+          <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 sm:px-3">
+            <span className="truncate font-mono text-[9px] font-semibold uppercase tracking-wide text-[var(--text)] sm:text-[10px]">Template (A)</span>
+            <span className="hidden truncate font-mono text-[10px] text-[var(--muted)] sm:block">appsettings.tpl.json</span>
           </div>
-          <div className="py-1 font-mono text-[11px] leading-[1.8]">
+          <div className="preview-code-lines py-1 font-mono text-[9px] leading-[1.65] min-[390px]:text-[10px] sm:text-[11px] sm:leading-[1.8]">
             {paired.map(({ a }, idx) => (
-              <div key={idx} className={`flex min-h-[22px] items-center gap-2 px-3 ${lineTintClass(a.kind)}`}>
-                <span className="w-4 text-right text-[9px] text-[var(--muted)] opacity-50 shrink-0 select-none">
+              <div key={idx} className={`flex min-h-[18px] items-center gap-1 px-1.5 sm:min-h-[22px] sm:gap-2 sm:px-3 ${lineTintClass(a.kind)}`}>
+                <span className="w-3 shrink-0 select-none text-right text-[8px] text-[var(--muted)] opacity-50 sm:w-4 sm:text-[9px]">
                   {a.ln}
                 </span>
                 <span className="flex-1 whitespace-pre overflow-hidden text-ellipsis">
@@ -219,14 +219,14 @@ export function DiffPreviewCard() {
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[var(--bg)] border-b border-[var(--border)]">
-            <span className="font-mono text-[10px] font-semibold text-[var(--text)] uppercase tracking-wide">Aligned (B)</span>
-            <span className="font-mono text-[10px] text-[var(--muted)] truncate">appsettings.stg.json</span>
+          <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--bg)] px-2 py-1.5 sm:px-3">
+            <span className="truncate font-mono text-[9px] font-semibold uppercase tracking-wide text-[var(--text)] sm:text-[10px]">Aligned (B)</span>
+            <span className="hidden truncate font-mono text-[10px] text-[var(--muted)] sm:block">appsettings.stg.json</span>
           </div>
-          <div className="py-1 font-mono text-[11px] leading-[1.8]">
+          <div className="preview-code-lines py-1 font-mono text-[9px] leading-[1.65] min-[390px]:text-[10px] sm:text-[11px] sm:leading-[1.8]">
             {paired.map(({ b }, idx) => (
-              <div key={idx} className={`flex min-h-[22px] items-center gap-2 px-3 ${lineTintClass(b.kind)}`}>
-                <span className="w-4 text-right text-[9px] text-[var(--muted)] opacity-50 shrink-0 select-none">
+              <div key={idx} className={`flex min-h-[18px] items-center gap-1 px-1.5 sm:min-h-[22px] sm:gap-2 sm:px-3 ${lineTintClass(b.kind)}`}>
+                <span className="w-3 shrink-0 select-none text-right text-[8px] text-[var(--muted)] opacity-50 sm:w-4 sm:text-[9px]">
                   {b.ln}
                 </span>
                 <span className="flex-1 whitespace-pre overflow-hidden text-ellipsis">
