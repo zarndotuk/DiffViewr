@@ -48,7 +48,7 @@ export function HeroSection() {
           <div className="flex flex-col items-stretch gap-3 min-[390px]:flex-row min-[390px]:items-center">
             <Link
               href="/tool"
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-5 py-3 font-sans text-[15px] font-medium text-[#0c0e11] transition hover:opacity-90 min-[390px]:w-auto"
+              className="cyberpunk-button cta inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-5 py-3 font-sans text-[15px] font-medium focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] active:translate-y-px min-[390px]:w-auto"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path
@@ -63,7 +63,7 @@ export function HeroSection() {
             </Link>
             <Link
               href="/tool?sample=1"
-              className="inline-flex min-h-11 items-center justify-center px-2 font-mono text-[12px] font-semibold text-cyan-400 transition hover:text-cyan-300"
+              className="cyberpunk-button inline-flex min-h-12 w-full items-center justify-center rounded-lg px-5 py-3 font-sans text-[15px] font-medium focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] active:translate-y-px min-[390px]:w-auto"
             >
               View live demo
             </Link>

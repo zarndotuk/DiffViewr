@@ -19,11 +19,21 @@ const VisualComparePanel = dynamic<VisualComparePanelProps>(
     ssr: false,
     loading: () => (
       <div
-        className="rounded-xl border border-[var(--border)] p-4 text-[14px] text-[var(--muted)]"
+        className="min-h-[360px] rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 text-[14px] text-[var(--muted)]"
         role="status"
         aria-live="polite"
       >
-        Loading visual compare...
+        <div className="grid grid-cols-2 gap-4">
+          {[0, 1].map((pane) => (
+            <div key={pane} className="space-y-3">
+              <div className="h-3 w-24 rounded-sm bg-slate-700 motion-safe:animate-pulse" />
+              <div className="h-2 w-full rounded-sm bg-slate-800 motion-safe:animate-pulse" />
+              <div className="h-2 w-5/6 rounded-sm bg-slate-800 motion-safe:animate-pulse" />
+              <div className="h-2 w-2/3 rounded-sm bg-slate-800 motion-safe:animate-pulse" />
+            </div>
+          ))}
+        </div>
+        <span className="sr-only">Loading visual compare...</span>
       </div>
     )
   }
@@ -127,13 +137,13 @@ export function OutputSection({
   if (!isOutputVisible) return null;
 
   const tabBase =
-    "px-3 py-2 border-b-2 border-transparent font-sans text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
+    "px-3 py-2 border-b-2 border-transparent font-sans text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
   const activeTabClass = `${tabBase} border-cyan-400 text-[var(--text)]`;
   const inactiveTabClass = `${tabBase} text-[var(--muted)] hover:text-[var(--text)]`;
   const ghostActionClass =
-    "inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent font-sans text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
+    "inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent font-sans text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
   const primaryActionClass =
-    "inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent font-sans text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent font-sans text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-60";
 
   return (
     <section className={`${panelClass} mt-2 sm:mt-4`}>

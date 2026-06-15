@@ -623,6 +623,22 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     renderAligned(result.aRoot, result.bRoot, "$", "$", 0, lines, result.aIndent, result.bIndent);
     return lines;
   }, [result.aRoot, result.bRoot, result.aIndent, result.bIndent]);
+  const paneContentWidths = useMemo(() => {
+    const longest = aligned.reduce(
+      (current, line) => ({
+        a: Math.max(current.a, line.aText.length),
+        b: Math.max(current.b, line.bText.length)
+      }),
+      { a: 0, b: 0 }
+    );
+    const contentWidth = (lineLength: number) =>
+      `max(100%, ${Math.min(Math.max(lineLength + 10, 50), 260)}ch)`;
+
+    return {
+      a: contentWidth(longest.a),
+      b: contentWidth(longest.b)
+    };
+  }, [aligned]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -843,76 +859,80 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
           changeLineIndices.length > 0 ? "pb-20" : ""
         }`}
       >
-        <div className="flex min-w-0 gap-0 md:min-w-[820px] md:gap-3">
-          <div className={`${mobilePane === "a" ? "block" : "hidden"} min-w-0 flex-1 overflow-x-auto md:block md:overflow-hidden`}>
-            <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
-              Template (A)
+        <div className="flex w-full min-w-0 gap-0 md:gap-3">
+          <div className={`${mobilePane === "a" ? "block" : "hidden"} min-w-0 flex-1 basis-0 overflow-x-auto md:block`}>
+            <div style={{ minWidth: paneContentWidths.a }}>
+              <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)] px-3 py-2 text-xs uppercase text-[var(--muted)]">
+                Template (A)
+              </div>
+              <div
+                className="json-view relative w-full"
+                style={{ height: visibleLineIndices.length * ROW_HEIGHT }}
+              >
+                {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
+                  const line = aligned[idx];
+                  const inferred = line.aStatus
+                    ? line.aStatus
+                    : line.aPath
+                      ? aMap.get(line.aPath)
+                      : undefined;
+                  const isActive = activeLine === idx;
+                  return (
+                    <div
+                      key={`a-${idx}`}
+                      className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
+                      style={{
+                        height: ROW_HEIGHT,
+                        transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
+                      }}
+                    >
+                      <span className="json-lineno" aria-hidden="true">
+                        {idx + 1}
+                      </span>
+                      {renderTokenLine(aTokens?.[idx], line.aText)}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div
-              className="json-view relative w-full"
-              style={{ height: visibleLineIndices.length * ROW_HEIGHT }}
-            >
-              {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
-                const line = aligned[idx];
-                const inferred = line.aStatus
-                  ? line.aStatus
-                   : line.aPath
-                     ? aMap.get(line.aPath)
-                     : undefined;
-                const isActive = activeLine === idx;
-                return (
-                  <div
-                    key={`a-${idx}`}
-                    className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
-                    style={{
-                      height: ROW_HEIGHT,
-                      transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
-                    }}
-                  >
-                    <span className="json-lineno" aria-hidden="true">
-                      {idx + 1}
-                    </span>
-                    {renderTokenLine(aTokens?.[idx], line.aText)}
-                  </div>
-                );
-              })}
+          </div>
+          <div className={`${mobilePane === "b" ? "block" : "hidden"} min-w-0 flex-1 basis-0 overflow-x-auto md:block`}>
+            <div style={{ minWidth: paneContentWidths.b }}>
+              <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)] px-3 py-2 text-xs uppercase text-[var(--muted)]">
+                Aligned (B)
+              </div>
+              <div
+                className="json-view relative w-full"
+                style={{ height: visibleLineIndices.length * ROW_HEIGHT }}
+              >
+                {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
+                  const line = aligned[idx];
+                  const inferred = line.bStatus
+                    ? line.bStatus
+                    : line.bPath
+                      ? bMap.get(line.bPath)
+                      : undefined;
+                  const isActive = activeLine === idx;
+                  return (
+                    <div
+                      key={`b-${idx}`}
+                      className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
+                      style={{
+                        height: ROW_HEIGHT,
+                        transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
+                      }}
+                    >
+                      <span className="json-lineno" aria-hidden="true">
+                        {idx + 1}
+                      </span>
+                      {renderTokenLine(bTokens?.[idx], line.bText)}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-</div>
-          <div className={`${mobilePane === "b" ? "block" : "hidden"} min-w-0 flex-1 overflow-x-auto md:block md:overflow-hidden`}>
-            <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
-              Aligned (B)
-            </div>
-            <div
-              className="json-view relative w-full"
-              style={{ height: visibleLineIndices.length * ROW_HEIGHT }}
-            >
-              {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
-                const line = aligned[idx];
-                const inferred = line.bStatus
-                  ? line.bStatus
-                  : line.bPath
-                    ? bMap.get(line.bPath)
-                    : undefined;
-                const isActive = activeLine === idx;
-                return (
-                  <div
-                    key={`b-${idx}`}
-                    className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
-                    style={{
-                      height: ROW_HEIGHT,
-                      transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
-                    }}
-                  >
-                    <span className="json-lineno" aria-hidden="true">
-                      {idx + 1}
-                    </span>
-                    {renderTokenLine(bTokens?.[idx], line.bText)}
-                  </div>
-                );
-              })}
-            </div>
-           </div>
-         </div>
+          </div>
+        </div>
 
        {changeLineIndices.length > 0 && (
          <div className="mobile-change-nav fixed bottom-3 left-1/2 z-30 flex w-[calc(100%_-_2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[var(--panel)] px-0.5 py-1 shadow-[0_4px_12px_rgba(0,0,0,0.28)] sm:bottom-6 sm:w-fit sm:max-w-none">

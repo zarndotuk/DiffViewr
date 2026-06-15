@@ -70,7 +70,7 @@ function ConfigInputPanel({
 
   return (
     <section className={panelClass}>
-      <div className="panel-wrapper rounded-xl border border-[var(--border)] focus-within:outline-none">
+      <div className="panel-wrapper rounded-xl border border-[var(--border)] focus-within:outline-hidden">
         <div className="flex min-h-12 items-center justify-between gap-2 rounded-t-xl border-b border-[var(--border)] bg-[var(--panel)] px-3 py-2">
           <div className="flex min-w-0 items-center gap-2">
             <span className={sideBadgeClass}>{side}</span>
@@ -131,7 +131,7 @@ function ConfigInputPanel({
                   <span> (line {errorLine})</span>{" "}
                   <button
                     type="button"
-                    className="underline underline-offset-2 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+                    className="underline underline-offset-2 hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--danger)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
                     onClick={() => onJumpToLine(errorLine)}
                     aria-label={`Jump to line ${errorLine}`}
                   >
@@ -185,7 +185,7 @@ export function JsonInputGrid({
         jsonInputSizeClass={jsonInputSizeClass}
         id="reference-json"
         side="A"
-        sideBadgeClass="flex h-5 w-5 items-center justify-center rounded border border-cyan-400/40 font-mono text-[10px] text-cyan-400 shrink-0"
+        sideBadgeClass="flex h-5 w-5 items-center justify-center rounded-sm border border-cyan-400/40 font-mono text-[10px] text-cyan-400 shrink-0"
         label="Template"
         collapsedLabel="A"
         subLabel="— source of truth, key order reference"
@@ -215,7 +215,7 @@ export function JsonInputGrid({
         jsonInputSizeClass={jsonInputSizeClass}
         id="target-json"
         side="B"
-        sideBadgeClass="flex h-5 w-5 items-center justify-center rounded border border-[var(--border)] font-mono text-[10px] text-[var(--muted)] shrink-0"
+        sideBadgeClass="flex h-5 w-5 items-center justify-center rounded-sm border border-[var(--border)] font-mono text-[10px] text-[var(--muted)] shrink-0"
         label="Target"
         collapsedLabel="B"
         subLabel="— your environment config"
