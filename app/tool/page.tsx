@@ -21,17 +21,41 @@ type SortResult = {
   targetFormat: SupportedFormat;
 };
 
+const MIN_COMPARE_FEEDBACK_MS = 1000;
+
+async function waitForMinimumDuration(startedAt: number) {
+  const remaining = MIN_COMPARE_FEEDBACK_MS - (performance.now() - startedAt);
+  if (remaining > 0) {
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, remaining);
+    });
+  }
+}
+
 const OutputSection = dynamic<OutputSectionProps>(
   () => import("@/components/tool/output-section").then((mod) => mod.OutputSection),
   {
     ssr: false,
     loading: () => (
       <section
-        className="mt-4 p-8 text-[14px] text-[var(--muted)]"
+        className="mt-4 min-h-[420px] rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5 text-[14px] text-[var(--muted)]"
         role="status"
         aria-live="polite"
       >
-        Preparing results...
+        <div className="h-10 border-b border-[var(--border)]" />
+        <div className="mt-4 min-h-[320px] rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_58%,transparent)] p-4">
+          <div className="grid grid-cols-2 gap-5">
+            {[0, 1].map((pane) => (
+              <div key={pane} className="space-y-3">
+                <div className="h-3 w-24 rounded-sm bg-slate-700 motion-safe:animate-pulse" />
+                <div className="h-2 w-full rounded-sm bg-slate-800 motion-safe:animate-pulse" />
+                <div className="h-2 w-4/5 rounded-sm bg-slate-800 motion-safe:animate-pulse" />
+                <div className="h-2 w-2/3 rounded-sm bg-slate-800 motion-safe:animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <span className="sr-only">Preparing results...</span>
       </section>
     )
   }
@@ -114,14 +138,14 @@ export default function Page() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && bothHaveContent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && bothHaveContent && !isProcessing) {
         sortAndCompare({ reorderArrays });
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bothHaveContent, reorderArrays]);
+  }, [bothHaveContent, isProcessing, reorderArrays]);
 
   useEffect(() => {
     const requestId = ++validationARequestRef.current;
@@ -267,6 +291,7 @@ export default function Page() {
     setShowStartAgainConfirm(false);
     comparisonRequestRef.current += 1;
     clearMessages();
+    setIsProcessing(false);
     setRefText("");
     setTargetText("");
     setResult(null);
@@ -323,8 +348,11 @@ export default function Page() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function sortAndCompare(options?: { reorderArrays?: boolean }) {
+    if (isProcessing || !bothHaveContent) return;
+
     const effectiveReorderArrays = options?.reorderArrays ?? reorderArrays;
     const requestId = ++comparisonRequestRef.current;
+    const startedAt = performance.now();
 
     clearMessages();
     setDuplicateIssueGroups(null);
@@ -353,6 +381,7 @@ export default function Page() {
         targetText,
         effectiveReorderArrays
       );
+      await waitForMinimumDuration(startedAt);
       if (requestId !== comparisonRequestRef.current) return;
       setValidationA(processed.validationA);
       setValidationB(processed.validationB);
@@ -370,6 +399,7 @@ export default function Page() {
       });
       setShowFeedbackPrompt(!hasRated);
     } catch (e) {
+      await waitForMinimumDuration(startedAt);
       if (requestId !== comparisonRequestRef.current) return;
       setError(String(e instanceof Error ? e.message : e));
     } finally {
@@ -500,25 +530,75 @@ const jsonInputSizeClass =
     ? "min-h-[160px] max-h-[220px]"
     : "min-h-[300px] sm:min-h-[380px] lg:min-h-[520px]";
 const buttonBase =
-  "cyberpunk-button px-3 py-2 rounded-lg font-sans text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d4aa] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
+  "cyberpunk-button px-3 py-2 rounded-lg font-sans text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[#00d4aa] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
 const buttonPrimary =
-  "cyberpunk-button primary px-3 py-2 rounded-lg font-sans text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d4aa] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
+  "cyberpunk-button primary px-3 py-2 rounded-lg font-sans text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[#00d4aa] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
   const ctaButton =
     "inline-flex min-h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-5 py-3 font-sans text-[15px] font-medium text-[var(--muted)] " +
     "cursor-not-allowed transition-colors duration-200 enabled:cursor-pointer enabled:border-transparent enabled:bg-cyan-400 enabled:text-[#0c0e11] " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d4aa] " +
+    "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[#00d4aa] " +
     "focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]";
 
   return (
     <Suspense fallback={null}>
       <SearchParamsInit onLoadSample={onLoadSample}>
-        <main id="main" className="flex flex-col py-2 sm:py-4">
+        <main
+          id="main"
+          className="flex flex-col py-2 sm:py-4"
+          aria-busy={isProcessing || undefined}
+        >
       <a
         href="#results"
         className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-[var(--panel)] focus:px-3 focus:py-2 focus:text-sm focus:text-[var(--text)] focus:shadow-[var(--shadow)]"
       >
         Skip to results
       </a>
+
+      {isProcessing ? (
+        <div
+          className="modal-overlay-in fixed inset-0 z-40 flex items-center justify-center bg-[color-mix(in_srgb,var(--bg)_82%,transparent)] px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="compare-progress-title"
+          aria-describedby="compare-progress-description"
+        >
+          <div className="modal-card-in w-full max-w-[440px] rounded-xl border border-[color-mix(in_srgb,var(--accent)_32%,var(--border))] bg-[var(--panel)] p-5 shadow-[0_24px_70px_rgba(0,8,13,0.52)] sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-cyan-400/25 bg-cyan-400/10 text-cyan-300">
+                <i className="ti ti-adjustments-horizontal text-[19px]" aria-hidden="true" />
+              </div>
+              <div>
+                <h2 id="compare-progress-title" className="font-sans text-[17px] font-medium text-[var(--text)]">
+                  Comparing configs
+                </h2>
+                <p id="compare-progress-description" className="mt-1 font-sans text-[13px] leading-relaxed text-[var(--muted)]">
+                  Aligning Template A with Target B and isolating meaningful changes.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 overflow-hidden rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_58%,transparent)] p-3">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div className="space-y-2">
+                  <div className="h-2 w-3/4 rounded-sm bg-slate-700 motion-safe:animate-pulse" />
+                  <div className="h-2 w-full rounded-sm bg-slate-800 motion-safe:animate-pulse" />
+                  <div className="h-2 w-2/3 rounded-sm bg-slate-800 motion-safe:animate-pulse" />
+                </div>
+                <i className="ti ti-arrow-right text-[16px] text-cyan-400" aria-hidden="true" />
+                <div className="space-y-2">
+                  <div className="h-2 w-2/3 rounded-sm bg-cyan-400/25 motion-safe:animate-pulse" />
+                  <div className="h-2 w-full rounded-sm bg-slate-800 motion-safe:animate-pulse" />
+                  <div className="h-2 w-4/5 rounded-sm bg-emerald-400/20 motion-safe:animate-pulse" />
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-4 font-mono text-[11px] text-[var(--muted)]" role="status" aria-live="polite">
+              Processing locally in your browser
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className={flags.adsEnabled ? "flex gap-6 items-start w-full" : "flex items-start w-full"}>
         <div className="flex-1 min-w-0">
@@ -610,7 +690,7 @@ const buttonPrimary =
                   </label>
                 ) : null}
               </div>
-              <div className="mobile-safe-action sticky bottom-0 z-20 flex items-center justify-between gap-4 bg-[color-mix(in_srgb,var(--bg)_92%,transparent)] px-0 py-3 backdrop-blur-sm sm:px-6">
+              <div className="mobile-safe-action sticky bottom-0 z-20 flex items-center justify-between gap-4 bg-[color-mix(in_srgb,var(--bg)_92%,transparent)] px-0 py-3 backdrop-blur-xs sm:px-6">
                 <div className="w-32 hidden sm:block" />
                 <button
                   className={ctaButton}

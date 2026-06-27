@@ -1,6 +1,7 @@
 node_modules
 .next
 out
+app/generated.css
 .env.local
 .DS_Store
 npm-debug.log*

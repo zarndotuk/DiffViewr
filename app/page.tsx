@@ -308,7 +308,8 @@ export default function Page() {
               <div className="mb-3 h-2 w-20 rounded-full bg-slate-700" />
               <div className="mb-2 h-2 w-full rounded-full bg-slate-800" />
               <div className="h-2 w-2/3 rounded-full bg-slate-800" />
-              <div className="mt-4 inline-flex rounded-lg bg-cyan-400 px-4 py-2 font-mono text-[12px] font-bold text-[#0c0e11]">
+              <div className="mt-4 inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-[11px] font-medium text-slate-200">
+                <i className="ti ti-copy text-[14px] text-cyan-300" aria-hidden="true" />
                 Copy Config
               </div>
             </div>
@@ -345,7 +346,7 @@ export default function Page() {
             </p>
             <Link
               href="/tool/"
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-6 py-3 font-sans text-[15px] font-medium text-[#0c0e11] transition hover:opacity-90 sm:w-auto"
+              className="cyberpunk-button cta inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-6 py-3 font-sans text-[15px] font-medium focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] active:translate-y-px sm:w-auto"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path

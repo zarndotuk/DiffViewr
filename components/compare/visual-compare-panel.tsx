@@ -624,6 +624,22 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     renderAligned(result.aRoot, result.bRoot, "$", "$", 0, lines, result.aIndent, result.bIndent);
     return lines;
   }, [result.aRoot, result.bRoot, result.aIndent, result.bIndent]);
+  const paneContentWidths = useMemo(() => {
+    const longest = aligned.reduce(
+      (current, line) => ({
+        a: Math.max(current.a, line.aText.length),
+        b: Math.max(current.b, line.bText.length)
+      }),
+      { a: 0, b: 0 }
+    );
+    const contentWidth = (lineLength: number) =>
+      `max(100%, ${Math.min(Math.max(lineLength + 10, 50), 260)}ch)`;
+
+    return {
+      a: contentWidth(longest.a),
+      b: contentWidth(longest.b)
+    };
+  }, [aligned]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -845,98 +861,102 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
           onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
           className="max-h-[70vh] min-h-[360px] w-full overflow-auto rounded-xl border border-[var(--border)]"
         >
-        <div className="flex min-w-0 gap-0 md:min-w-[820px] md:gap-3">
-          <div className={`${mobilePane === "a" ? "block" : "hidden"} min-w-0 flex-1 overflow-x-auto md:block md:overflow-hidden`}>
-            <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
-              Template (A)
-            </div>
-            <div
-              className="json-view relative w-full"
-              style={{ height: editorHeight }}
-            >
-              {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
-                const line = aligned[idx];
-                const inferred = line.aStatus
-                  ? line.aStatus
-                   : line.aPath
-                     ? aMap.get(line.aPath)
-                     : undefined;
-                const isActive = activeLine === idx;
-                return (
-                  <div
-                    key={`a-${idx}`}
-                    className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
-                    style={{
-                      height: ROW_HEIGHT,
-                      transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
-                    }}
-                  >
-                    <span className="json-lineno" aria-hidden="true">
-                      {idx + 1}
-                    </span>
-                    {renderTokenLine(aTokens?.[idx], line.aText)}
-                  </div>
-                );
-              })}
+          <div className="flex w-full min-w-0 gap-0 md:gap-3">
+          <div className={`${mobilePane === "a" ? "block" : "hidden"} min-w-0 flex-1 basis-0 overflow-x-auto md:block`}>
+            <div style={{ minWidth: paneContentWidths.a }}>
+              <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)] px-3 py-2 text-xs uppercase text-[var(--muted)]">
+                Template (A)
+              </div>
               <div
-                className="json-line same json-editor-line absolute left-0 right-0"
-                style={{
-                  height: ROW_HEIGHT,
-                  transform: `translateY(${visibleLineIndices.length * ROW_HEIGHT}px)`
-                }}
-                aria-hidden="true"
+                className="json-view relative w-full"
+                style={{ height: editorHeight }}
               >
-                <span className="json-lineno">&nbsp;</span>
-                <span className="json-code whitespace-pre">&nbsp;</span>
+                {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
+                  const line = aligned[idx];
+                  const inferred = line.aStatus
+                    ? line.aStatus
+                    : line.aPath
+                      ? aMap.get(line.aPath)
+                      : undefined;
+                  const isActive = activeLine === idx;
+                  return (
+                    <div
+                      key={`a-${idx}`}
+                      className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
+                      style={{
+                        height: ROW_HEIGHT,
+                        transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
+                      }}
+                    >
+                      <span className="json-lineno" aria-hidden="true">
+                        {idx + 1}
+                      </span>
+                      {renderTokenLine(aTokens?.[idx], line.aText)}
+                    </div>
+                  );
+                })}
+                <div
+                  className="json-line same json-editor-line absolute left-0 right-0"
+                  style={{
+                    height: ROW_HEIGHT,
+                    transform: `translateY(${visibleLineIndices.length * ROW_HEIGHT}px)`
+                  }}
+                  aria-hidden="true"
+                >
+                  <span className="json-lineno">&nbsp;</span>
+                  <span className="json-code whitespace-pre">&nbsp;</span>
+                </div>
               </div>
             </div>
-</div>
-          <div className={`${mobilePane === "b" ? "block" : "hidden"} min-w-0 flex-1 overflow-x-auto md:block md:overflow-hidden`}>
-            <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
-              Aligned (B)
-            </div>
-            <div
-              className="json-view relative w-full"
-              style={{ height: editorHeight }}
-            >
-              {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
-                const line = aligned[idx];
-                const inferred = line.bStatus
-                  ? line.bStatus
-                  : line.bPath
-                    ? bMap.get(line.bPath)
-                    : undefined;
-                const isActive = activeLine === idx;
-                return (
-                  <div
-                    key={`b-${idx}`}
-                    className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
-                    style={{
-                      height: ROW_HEIGHT,
-                      transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
-                    }}
-                  >
-                    <span className="json-lineno" aria-hidden="true">
-                      {idx + 1}
-                    </span>
-                    {renderTokenLine(bTokens?.[idx], line.bText)}
-                  </div>
-                );
-              })}
+          </div>
+          <div className={`${mobilePane === "b" ? "block" : "hidden"} min-w-0 flex-1 basis-0 overflow-x-auto md:block`}>
+            <div style={{ minWidth: paneContentWidths.b }}>
+              <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)] px-3 py-2 text-xs uppercase text-[var(--muted)]">
+                Aligned (B)
+              </div>
               <div
-                className="json-line same json-editor-line absolute left-0 right-0"
-                style={{
-                  height: ROW_HEIGHT,
-                  transform: `translateY(${visibleLineIndices.length * ROW_HEIGHT}px)`
-                }}
-                aria-hidden="true"
+                className="json-view relative w-full"
+                style={{ height: editorHeight }}
               >
-                <span className="json-lineno">&nbsp;</span>
-                <span className="json-code whitespace-pre">&nbsp;</span>
+                {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
+                  const line = aligned[idx];
+                  const inferred = line.bStatus
+                    ? line.bStatus
+                    : line.bPath
+                      ? bMap.get(line.bPath)
+                      : undefined;
+                  const isActive = activeLine === idx;
+                  return (
+                    <div
+                      key={`b-${idx}`}
+                      className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
+                      style={{
+                        height: ROW_HEIGHT,
+                        transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
+                      }}
+                    >
+                      <span className="json-lineno" aria-hidden="true">
+                        {idx + 1}
+                      </span>
+                      {renderTokenLine(bTokens?.[idx], line.bText)}
+                    </div>
+                  );
+                })}
+                <div
+                  className="json-line same json-editor-line absolute left-0 right-0"
+                  style={{
+                    height: ROW_HEIGHT,
+                    transform: `translateY(${visibleLineIndices.length * ROW_HEIGHT}px)`
+                  }}
+                  aria-hidden="true"
+                >
+                  <span className="json-lineno">&nbsp;</span>
+                  <span className="json-code whitespace-pre">&nbsp;</span>
+                </div>
               </div>
             </div>
-           </div>
-         </div>
+          </div>
+          </div>
         </div>
 
        {changeLineIndices.length > 0 && (

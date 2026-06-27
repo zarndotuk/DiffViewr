@@ -3,7 +3,7 @@ import {
   Geist,
   JetBrains_Mono
 } from "next/font/google";
-import "./globals.css";
+import "./generated.css";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { Analytics } from "./analytics";

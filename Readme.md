@@ -1,38 +1,61 @@
-## DiffViewr (Next.js static export)
+# DiffViewr
 
-Fully client-side JSON reorder utility:
+**Review config changes, without the noise.**
 
-- Paste **Reference JSON (A)** and **Target JSON (B)**
-- Choose a **target path** (default: `$`)
-- Reorder **only ordering** at that path:
-  - array → reorder B array items based on A
-  - object → reorder B object keys based on A
-- No backend, no API routes, no server actions
+[diffviewr.com](https://www.diffviewr.com) · [Live demo](https://www.diffviewr.com/tool/?sample=1)
 
-### Run
+DiffViewr is a 100% client-side config diff tool built for developers. Paste your template as **A** and your environment config as **B** — DiffViewr aligns key order before comparing, so you only see the values that actually changed.
+
+No sign-up. No server. No paste limits.
+
+---
+
+## The problem
+
+Standard `git diff` on a config file flags every reordered key as a change. On a real `appsettings.json`, that might mean 44 lines flagged when only 3 values actually differ. You're reviewing noise, not signal.
+
+DiffViewr treats Template A as the source of truth, reorders Target B against it, then surfaces only the differences that matter.
+
+---
+
+## Features
+
+- **Template A → Target B model** — one file is the reference, not an equal comparison
+- **Key-order normalisation** — reordering is stripped before diffing so you see real changes only
+- **Format-aware** — supports JSON, YAML, and `.env` files, with format detection and validation feedback
+- **Visual side-by-side compare** — changed, missing, and added values are clearly marked
+- **Export clean config** — copy a reordered, review-ready version of your target config
+- **Entirely in-browser** — static Next.js export, no backend, no API routes, no data leaves your machine
+
+---
+
+## Getting started
 
 ```bash
 npm install
 npm run dev
 ```
 
-### Static export build
+Open [http://localhost:3000](http://localhost:3000).
+
+### Production build
 
 ```bash
 npm run build
 ```
 
-The static site is emitted to `out/` (Next.js `output: "export"`).
+The static site is emitted to `out/` via Next.js `output: "export"`. Deploy to any static host (Cloudflare Pages, Vercel, Netlify, etc.).
 
-### Path syntax
+---
 
-- Root: `$`
-- Object keys: `$.items` or `items`
-- Array indices: `$.items[0]`
-- Bracket keys: `$['key.with.dots']`
+## Common workflows
 
-### Array matching
+- **Pre-release checks** — compare your template config against staging or production before deploying
+- **Env drift detection** — spot meaningful differences between environment configs
+- **Cleaner PRs** — normalise key order so reviewers aren't wading through noise
 
-- Arrays of primitives match by strict value + type (`"1"` ≠ `1`, `"true"` ≠ `true`)
-- Arrays of objects match using a **match field path** like `id` or `meta.code`
-- Missing items from A are reported, but never inserted into B
+---
+
+## License
+
+[MIT](./LICENSE)
