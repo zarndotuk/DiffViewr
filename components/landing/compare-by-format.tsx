@@ -8,15 +8,12 @@ export function CompareByFormat() {
         <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="font-mono text-[12px] uppercase tracking-[1.8px] text-cyan-400">
-              Compare by format
+              Three formats. One format-aware diff.
             </p>
             <h2 className="mt-3 font-sans text-[2rem] font-normal leading-tight tracking-tight text-[var(--text)]">
               Land on the comparer that matches your file.
             </h2>
           </div>
-          <p className="max-w-xl font-sans text-[14px] leading-6 text-[var(--muted)]">
-            Each format page opens with realistic sample data already loaded, so you can test the workflow before pasting your own config.
-          </p>
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
@@ -41,7 +38,7 @@ export function CompareByFormat() {
                   </span>
                 </span>
                 <span className="mt-5 inline-flex items-center gap-2 font-mono text-[12px] text-cyan-400">
-                  Open sample
+                  Try it now
                   <i className="ti ti-arrow-right text-[14px] transition group-hover:translate-x-0.5" aria-hidden="true" />
                 </span>
               </Link>

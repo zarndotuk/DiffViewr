@@ -13,7 +13,7 @@ type TrustPoint = {
 const trustPoints: TrustPoint[] = [
   {
     title: "100% client-side",
-    subLabel: "no account, no upload",
+    subLabel: "no signup, no upload",
     icon: "ti-shield-lock"
   },
   {
@@ -391,7 +391,7 @@ export default function Page() {
           </div>
           <div className="mt-10 flex flex-col items-center gap-4 text-center">
             <p className="font-mono text-[13px] text-[var(--muted)]">
-              No paste limits / No watermarks / No account
+              No paste limits / No watermarks / No signup
             </p>
             <Link
               href="/tool/"
