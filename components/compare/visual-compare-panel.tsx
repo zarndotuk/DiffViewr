@@ -162,6 +162,7 @@ function alignPrimitiveArrays(a: unknown[], b: unknown[]): ArrayOp[] | null {
 type ActiveDiffKind = Exclude<DiffKind, "same">;
 const ROW_HEIGHT = 27;
 const VIRTUAL_OVERSCAN = 24;
+const TRAILING_EDITOR_LINES = 1;
 
 function diffKindPriority(kind?: DiffKind) {
   switch (kind) {
@@ -771,6 +772,8 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
       }));
   }, [scrollTop, viewportHeight, visibleLineIndices]);
 
+  const editorHeight = (visibleLineIndices.length + TRAILING_EDITOR_LINES) * ROW_HEIGHT;
+
   const goToChange = useCallback((pos: number) => {
     if (pos < 0 || pos >= changeLineIndices.length) return;
     setActiveChangePos(pos);
@@ -836,13 +839,12 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
           Aligned B
         </button>
       </div>
-      <div
-        ref={scrollRef}
-        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
-        className={`relative max-h-[70vh] min-h-[360px] w-full overflow-auto rounded-xl border border-[var(--border)] ${
-          changeLineIndices.length > 0 ? "pb-20" : ""
-        }`}
-      >
+      <div className="relative">
+        <div
+          ref={scrollRef}
+          onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+          className="max-h-[70vh] min-h-[360px] w-full overflow-auto rounded-xl border border-[var(--border)]"
+        >
         <div className="flex min-w-0 gap-0 md:min-w-[820px] md:gap-3">
           <div className={`${mobilePane === "a" ? "block" : "hidden"} min-w-0 flex-1 overflow-x-auto md:block md:overflow-hidden`}>
             <div className="sticky top-0 z-10 px-3 py-2 text-xs uppercase text-[var(--muted)] border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_75%,transparent)]">
@@ -850,7 +852,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
             </div>
             <div
               className="json-view relative w-full"
-              style={{ height: visibleLineIndices.length * ROW_HEIGHT }}
+              style={{ height: editorHeight }}
             >
               {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
                 const line = aligned[idx];
@@ -876,6 +878,17 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
                   </div>
                 );
               })}
+              <div
+                className="json-line same json-editor-line absolute left-0 right-0"
+                style={{
+                  height: ROW_HEIGHT,
+                  transform: `translateY(${visibleLineIndices.length * ROW_HEIGHT}px)`
+                }}
+                aria-hidden="true"
+              >
+                <span className="json-lineno">&nbsp;</span>
+                <span className="json-code whitespace-pre">&nbsp;</span>
+              </div>
             </div>
 </div>
           <div className={`${mobilePane === "b" ? "block" : "hidden"} min-w-0 flex-1 overflow-x-auto md:block md:overflow-hidden`}>
@@ -884,7 +897,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
             </div>
             <div
               className="json-view relative w-full"
-              style={{ height: visibleLineIndices.length * ROW_HEIGHT }}
+              style={{ height: editorHeight }}
             >
               {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
                 const line = aligned[idx];
@@ -910,12 +923,24 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
                   </div>
                 );
               })}
+              <div
+                className="json-line same json-editor-line absolute left-0 right-0"
+                style={{
+                  height: ROW_HEIGHT,
+                  transform: `translateY(${visibleLineIndices.length * ROW_HEIGHT}px)`
+                }}
+                aria-hidden="true"
+              >
+                <span className="json-lineno">&nbsp;</span>
+                <span className="json-code whitespace-pre">&nbsp;</span>
+              </div>
             </div>
            </div>
          </div>
+        </div>
 
        {changeLineIndices.length > 0 && (
-         <div className="mobile-change-nav fixed bottom-3 left-1/2 z-30 flex w-[calc(100%_-_2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[var(--panel)] px-0.5 py-1 shadow-[0_4px_12px_rgba(0,0,0,0.28)] sm:bottom-6 sm:w-fit sm:max-w-none">
+         <div className="mobile-change-nav absolute bottom-3 left-1/2 z-30 flex w-[calc(100%_-_2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[var(--panel)] px-0.5 py-1 shadow-[0_4px_12px_rgba(0,0,0,0.28)] sm:bottom-6 sm:w-fit sm:max-w-none">
            <button
              type="button"
              className="flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--muted)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--text)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"

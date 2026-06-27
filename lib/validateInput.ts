@@ -1,10 +1,19 @@
 import { load } from "js-yaml";
+import { validateDuplicateKeys, type DuplicateKeyIssue } from "@/lib/duplicateKeys";
 
 export type SupportedFormat = "json" | "yaml" | "env" | "unknown";
 
 export type ValidationResult =
   | { valid: true; format: string; parsed: Record<string, unknown> }
-  | { valid: false; format: string; error: string; line: number | null };
+  | {
+      valid: false;
+      format: string;
+      error: string;
+      line: number | null;
+      errorType?: "DUPLICATE_KEYS";
+      issues?: DuplicateKeyIssue[];
+      recommendation?: string;
+    };
 
 function toParsedRecord(value: unknown): Record<string, unknown> {
   if (Array.isArray(value)) {
@@ -61,6 +70,20 @@ export function validateInput(input: string, format: SupportedFormat): Validatio
       format,
       error: "Unrecognised format",
       line: null,
+    };
+  }
+
+  const duplicateValidation = validateDuplicateKeys(text, format);
+  if (!duplicateValidation.isValid) {
+    const firstIssue = duplicateValidation.issues?.[0];
+    return {
+      valid: false,
+      format,
+      error: duplicateValidation.message,
+      line: firstIssue?.line ?? null,
+      errorType: duplicateValidation.errorType,
+      issues: duplicateValidation.issues,
+      recommendation: duplicateValidation.recommendation
     };
   }
 

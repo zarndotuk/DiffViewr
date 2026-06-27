@@ -650,7 +650,7 @@ input {
 }
 
 .json-line.missing {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  background: rgb(248 113 113 / 0.12);
 }
 
 .json-line.extra {
@@ -662,7 +662,7 @@ input {
 }
 
 .json-line.mismatch {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  background: rgb(248 113 113 / 0.18);
 }
 
 @keyframes jsonLinePulse {

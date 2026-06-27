@@ -4,6 +4,10 @@ import dynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import type { CompareResult } from "@/types/diff";
+import {
+  DuplicateKeysModal,
+  type DuplicateIssueGroup
+} from "@/components/tool/duplicate-keys-modal";
 import { JsonInputGrid } from "@/components/tool/json-input-grid";
 import type { OutputSectionProps } from "@/components/tool/output-section";
 import type { SupportedFormat, ValidationResult } from "@/lib/validateInput";
@@ -71,9 +75,11 @@ export default function Page() {
   const [inputsCollapsed, setInputsCollapsed] = useState<boolean>(false);
   const [validationA, setValidationA] = useState<ValidationResult | null>(null);
   const [validationB, setValidationB] = useState<ValidationResult | null>(null);
+  const [duplicateIssueGroups, setDuplicateIssueGroups] = useState<DuplicateIssueGroup[] | null>(null);
   const refImmediateValidateNext = useRef(false);
   const targetImmediateValidateNext = useRef(false);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState<boolean>(false);
+  const [showStartAgainConfirm, setShowStartAgainConfirm] = useState<boolean>(false);
   const [rating, setRating] = useState<number>(0);
   const [hasRated, setHasRated] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -202,9 +208,63 @@ export default function Page() {
     setStatus("");
   }
 
+  function buildDuplicateIssueGroups(
+    nextValidationA: ValidationResult | null,
+    nextValidationB: ValidationResult | null
+  ): DuplicateIssueGroup[] {
+    const groups: DuplicateIssueGroup[] = [];
+
+    if (
+      nextValidationA &&
+      !nextValidationA.valid &&
+      nextValidationA.errorType === "DUPLICATE_KEYS" &&
+      nextValidationA.issues?.length
+    ) {
+      groups.push({
+        side: "left",
+        label: "Left file, Template A",
+        editorId: "reference-json",
+        issues: nextValidationA.issues
+      });
+    }
+
+    if (
+      nextValidationB &&
+      !nextValidationB.valid &&
+      nextValidationB.errorType === "DUPLICATE_KEYS" &&
+      nextValidationB.issues?.length
+    ) {
+      groups.push({
+        side: "right",
+        label: "Right file, Target B",
+        editorId: "target-json",
+        issues: nextValidationB.issues
+      });
+    }
+
+    return groups;
+  }
+
+  function editDuplicateFile(group: DuplicateIssueGroup) {
+    setDuplicateIssueGroups(null);
+    setInputsCollapsed(false);
+    setViewMode("editing");
+    requestAnimationFrame(() => {
+      const firstLine = group.issues.find((issue) => typeof issue.line === "number")?.line ?? 1;
+      jumpToTextareaLine(group.editorId, firstLine, true);
+    });
+  }
+
+  function showDuplicateDetails() {
+    const groups = buildDuplicateIssueGroups(validationA, validationB);
+    if (groups.length === 0) return;
+    setDuplicateIssueGroups(groups);
+  }
+
 
 
   function startAgain() {
+    setShowStartAgainConfirm(false);
     comparisonRequestRef.current += 1;
     clearMessages();
     setRefText("");
@@ -213,6 +273,7 @@ export default function Page() {
     setCompare(null);
     setValidationA(null);
     setValidationB(null);
+    setDuplicateIssueGroups(null);
     setInputsCollapsed(false);
     setActiveTab("compare");
     setShowFeedbackPrompt(false);
@@ -225,6 +286,10 @@ export default function Page() {
         el?.focus();
       });
     });
+  }
+
+  function requestStartAgain() {
+    setShowStartAgainConfirm(true);
   }
 
   async function copyResult() {
@@ -247,6 +312,7 @@ export default function Page() {
     setInputsCollapsed(false);
     setValidationA(null);
     setValidationB(null);
+    setDuplicateIssueGroups(null);
     setViewMode("editing");
 
     // Scroll to tool input after a brief delay to allow state updates
@@ -261,11 +327,27 @@ export default function Page() {
     const requestId = ++comparisonRequestRef.current;
 
     clearMessages();
+    setDuplicateIssueGroups(null);
     setResult(null);
     setCompare(null);
     setViewMode("editing");
     setIsProcessing(true);
     try {
+      const [nextValidationA, nextValidationB] = await Promise.all([
+        validate(refText).then((response) => response.validation),
+        validate(targetText).then((response) => response.validation)
+      ]);
+      if (requestId !== comparisonRequestRef.current) return;
+
+      setValidationA(nextValidationA);
+      setValidationB(nextValidationB);
+
+      const duplicateGroups = buildDuplicateIssueGroups(nextValidationA, nextValidationB);
+      if (duplicateGroups.length > 0) {
+        setDuplicateIssueGroups(duplicateGroups);
+        return;
+      }
+
       const processed = await processCompare(
         refText,
         targetText,
@@ -496,6 +578,8 @@ const buttonPrimary =
                 validationB={validationB}
                 onJumpToLineA={(lineNumber) => jumpToTextareaLine("reference-json", lineNumber)}
                 onJumpToLineB={(lineNumber) => jumpToTextareaLine("target-json", lineNumber)}
+                onShowDuplicateIssuesA={showDuplicateDetails}
+                onShowDuplicateIssuesB={showDuplicateDetails}
                 onPasteA={() => {
                   refImmediateValidateNext.current = true;
                 }}
@@ -580,7 +664,7 @@ const buttonPrimary =
               compare={compare}
               canCopy={canCopy}
               onCopyResult={copyResult}
-              onStartAgain={startAgain}
+              onStartAgain={requestStartAgain}
               showFeedbackPrompt={showFeedbackPrompt && activeTab === "compare"}
               rating={rating}
               onRate={setRating}
@@ -612,13 +696,51 @@ const buttonPrimary =
         )}
       </div>
 
+      {duplicateIssueGroups ? (
+        <DuplicateKeysModal groups={duplicateIssueGroups} onEditFile={editDuplicateFile} />
+      ) : null}
+
+      {showStartAgainConfirm ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-sm sm:items-center sm:px-6">
+          <section
+            className="w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.5)] sm:p-5"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="start-again-title"
+          >
+            <h2 id="start-again-title" className="text-lg font-semibold tracking-tight text-[var(--text)]">
+              Start a new comparison?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              This clears both editors and the current comparison result.
+            </p>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--panel)]"
+                onClick={() => setShowStartAgainConfirm(false)}
+              >
+                Stay here
+              </button>
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center justify-center rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-[#0c0e11] transition-transform active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d4aa] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--panel)]"
+                onClick={startAgain}
+              >
+                Start new comparison
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
         </main>
       </SearchParamsInit>
     </Suspense>
   );
 }
 
-function jumpToTextareaLine(textareaId: string, lineNumber: number) {
+function jumpToTextareaLine(textareaId: string, lineNumber: number, selectLine = false) {
   if (typeof document === "undefined") return;
   const el = document.getElementById(textareaId) as HTMLTextAreaElement | null;
   if (!el) return;
@@ -634,7 +756,8 @@ function jumpToTextareaLine(textareaId: string, lineNumber: number) {
 
   el.focus();
   try {
-    el.setSelectionRange(pos, pos);
+    const end = selectLine ? pos + (lines[clampedLine - 1]?.length ?? 0) : pos;
+    el.setSelectionRange(pos, end);
   } catch {
     // ignore
   }

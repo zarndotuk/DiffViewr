@@ -30,7 +30,18 @@ export function detectFormat(
       return "yaml";
     }
   } catch {
-    // fall through
+    try {
+      const result = load(text, { json: true });
+      if (
+        result !== null &&
+        result !== undefined &&
+        typeof result === "object"
+      ) {
+        return "yaml";
+      }
+    } catch {
+      // fall through
+    }
   }
 
   // 3) ENV: dotenv style KEY=VALUE.

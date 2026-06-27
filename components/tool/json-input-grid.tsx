@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { FormatBadge } from "@/components/tool/format-badge";
 import { useFormatDetection } from "@/hooks/use-format-detection";
 import type { ValidationResult } from "@/lib/validateInput";
@@ -21,6 +21,8 @@ type Props = {
   validationB: ValidationResult | null;
   onJumpToLineA: (lineNumber: number) => void;
   onJumpToLineB: (lineNumber: number) => void;
+  onShowDuplicateIssuesA: () => void;
+  onShowDuplicateIssuesB: () => void;
   onPasteA: () => void;
   onPasteB: () => void;
 };
@@ -40,6 +42,7 @@ type ConfigInputPanelProps = {
   validation: ValidationResult | null;
   collapsed: boolean;
   onJumpToLine: (lineNumber: number) => void;
+  onShowDuplicateIssues: () => void;
   onPaste: () => void;
   headerAction?: ReactNode;
 };
@@ -59,6 +62,7 @@ function ConfigInputPanel({
   validation,
   collapsed,
   onJumpToLine,
+  onShowDuplicateIssues,
   onPaste,
   headerAction
 }: ConfigInputPanelProps) {
@@ -67,6 +71,13 @@ function ConfigInputPanel({
     validation && !validation.valid && typeof validation.line === "number"
       ? validation.line
       : null;
+  const duplicateIssues = validation && !validation.valid ? validation.issues ?? [] : [];
+  const hasDuplicateIssues = duplicateIssues.length > 0;
+  const [scrollTop, setScrollTop] = useState(0);
+  const lineNumbers = useMemo(
+    () => Array.from({ length: Math.max(1, value.split(/\r\n|\r|\n/).length) }, (_, index) => index + 1),
+    [value]
+  );
 
   return (
     <section className={panelClass}>
@@ -95,30 +106,58 @@ function ConfigInputPanel({
             characters.
           </div>
         ) : (
-          <textarea
-            id={id}
-            className={`${inputClass} ${jsonInputSizeClass} rounded-t-none`}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onPaste={() => {
-              detection.markNextChangeImmediate();
-              onPaste();
-            }}
-            placeholder="Paste config here..."
-            spellCheck={false}
-            autoCorrect="off"
-            autoCapitalize="off"
-            inputMode="text"
-            enterKeyHint="done"
-            aria-invalid={validation ? !validation.valid : undefined}
-            aria-busy={detection.isDetecting || undefined}
-            suppressHydrationWarning
-          />
+          <div className="relative overflow-hidden rounded-b-xl">
+            <div
+              className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-12 overflow-hidden border-r border-[var(--border)] bg-[color-mix(in_srgb,var(--panel2)_70%,var(--panel))] py-3 pr-2 text-right font-mono text-[16px] leading-relaxed text-[var(--muted)] opacity-65 sm:text-[14px]"
+              aria-hidden="true"
+            >
+              <div style={{ transform: `translateY(-${scrollTop}px)` }}>
+                {lineNumbers.map((lineNumber) => (
+                  <div key={lineNumber}>{lineNumber}</div>
+                ))}
+              </div>
+            </div>
+            <textarea
+              id={id}
+              className={`${inputClass} ${jsonInputSizeClass} block rounded-t-none pl-16`}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+              onPaste={() => {
+                detection.markNextChangeImmediate();
+                onPaste();
+              }}
+              placeholder="Paste config here..."
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              inputMode="text"
+              enterKeyHint="done"
+              wrap="off"
+              aria-invalid={validation ? !validation.valid : undefined}
+              aria-busy={detection.isDetecting || undefined}
+              suppressHydrationWarning
+            />
+          </div>
         )}
       </div>
       {!collapsed ? (
         <>
-          {validation && !validation.valid && (
+          {validation && !validation.valid && hasDuplicateIssues && (
+            <button
+              type="button"
+              className="mt-2 flex w-full items-center justify-between gap-3 rounded-lg border border-red-400/50 bg-red-400/10 p-3 text-left text-sm text-red-200 transition-colors hover:bg-red-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+              onClick={onShowDuplicateIssues}
+              aria-label={`Show duplicate key details for ${label}`}
+              suppressHydrationWarning
+            >
+              <span>
+                <strong>Duplicate keys found.</strong> Fix before comparing.
+              </span>
+              <span className="shrink-0 font-mono text-xs text-red-100/85">View details</span>
+            </button>
+          )}
+          {validation && !validation.valid && !hasDuplicateIssues && (
             <div
               className="mt-2 p-3 rounded-lg border border-red-400/50 bg-red-400/10 text-red-300 text-sm"
               role="alert"
@@ -147,7 +186,7 @@ function ConfigInputPanel({
               aria-live="polite"
               suppressHydrationWarning
             >
-              Valid JSON detected ({value.length.toLocaleString()} characters)
+              Valid {String(validation.format).toUpperCase()} detected ({value.length.toLocaleString()} characters)
             </div>
           )}
         </>
@@ -172,6 +211,8 @@ export function JsonInputGrid({
   validationB,
   onJumpToLineA,
   onJumpToLineB,
+  onShowDuplicateIssuesA,
+  onShowDuplicateIssuesB,
   onPasteA,
   onPasteB
 }: Props) {
@@ -194,6 +235,7 @@ export function JsonInputGrid({
         validation={validationA}
         collapsed={collapsed}
         onJumpToLine={onJumpToLineA}
+        onShowDuplicateIssues={onShowDuplicateIssuesA}
         onPaste={onPasteA}
         headerAction={
           isOutputVisible ? (
@@ -224,6 +266,7 @@ export function JsonInputGrid({
         validation={validationB}
         collapsed={collapsed}
         onJumpToLine={onJumpToLineB}
+        onShowDuplicateIssues={onShowDuplicateIssuesB}
         onPaste={onPasteB}
       />
     </div>
