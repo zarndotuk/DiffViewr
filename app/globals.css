@@ -661,7 +661,6 @@ input {
 
 .json-line-active {
   background: color-mix(in srgb, var(--color-yellow-400) 30%, transparent);
-  border-left: 2px dotted var(--color-yellow-400);
   animation: none;
 }
 

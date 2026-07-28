@@ -907,6 +907,20 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
                         transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
                       }}
                     >
+                      {isActive && (
+                        <svg
+                          className="absolute left-1 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-400"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                          aria-hidden="true"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
                       <span className="json-lineno" aria-hidden="true">
                         {idx + 1}
                       </span>
@@ -971,6 +985,20 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
                         transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
                       }}
                     >
+                      {isActive && (
+                        <svg
+                          className="absolute left-1 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-400"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                          aria-hidden="true"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
                       <span className="json-lineno" aria-hidden="true">
                         {idx + 1}
                       </span>
