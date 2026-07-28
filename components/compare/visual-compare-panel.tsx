@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CompareResult, DiffNode, DiffKind } from "@/types/diff";
 import type { ShikiTokenLine } from "@/lib/shiki/getHighlighter";
 import { DiffSummaryBar } from "@/components/compare/diff-summary-bar";
+import { MiniMap } from "@/components/compare/mini-map";
 
 function collectPaths(node: DiffNode, paths: string[] = []) {
   paths.push(node.path);
@@ -44,11 +45,11 @@ function buildKindMaps(root: DiffNode) {
 function kindClass(kind?: DiffKind) {
   switch (kind) {
     case "missing":
-      return "json-line missing border-l-2 border-red-400/60";
+      return "json-line missing border-red-400/60";
     case "extra":
-      return "json-line extra border-l-2 border-emerald-400/60";
+      return "json-line extra border-emerald-400/60";
     case "changed":
-      return "json-line changed border-l-2 border-amber-400/60";
+      return "json-line changed border-amber-400/60";
     case "type_mismatch":
       return "json-line mismatch";
     default:
@@ -809,6 +810,22 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     }
   }, [changeLineIndices, visibleLineIndices]);
 
+  const scrollToLine = useCallback((lineIndex: number) => {
+    if (lineIndex < 0 || lineIndex >= aligned.length) return;
+    const visiblePosition = visibleLineIndices.indexOf(lineIndex);
+    if (visiblePosition >= 0 && scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: Math.max(
+          0,
+          visiblePosition * ROW_HEIGHT -
+            scrollRef.current.clientHeight / 2 +
+            ROW_HEIGHT / 2
+        ),
+        behavior: "smooth"
+      });
+    }
+  }, [aligned.length, visibleLineIndices]);
+
   function renderTokenLine(tokens: ShikiTokenLine | undefined, fallbackText: string) {
     if (!tokens) return <span className="json-code whitespace-pre">{fallbackText}</span>;
     return (
@@ -861,7 +878,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
           onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
           className="max-h-[70vh] min-h-[360px] w-full overflow-auto rounded-xl border border-[var(--border)]"
         >
-          <div className="flex w-full min-w-0 gap-0 md:gap-3">
+          <div className="flex w-full gap-0 md:gap-1">
           <div
             className={`${mobilePane === "a" ? "block" : "hidden"} min-w-0 flex-1 basis-0 overflow-hidden md:block`}
           >
@@ -910,6 +927,21 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
                 </div>
               </div>
             </div>
+          </div>
+          <div className="hidden md:block">
+            <div className="px-3 py-5" />
+            <MiniMap
+              visibleLineIndices={visibleLineIndices}
+              changeLineIndices={changeLineIndices}
+              aligned={aligned}
+              inferBetweenKind={inferBetweenKind}
+              activeFilterSet={activeFilterSet}
+              onScrollToLine={scrollToLine}
+              scrollTop={scrollTop}
+              viewportHeight={viewportHeight}
+              totalHeight={editorHeight}
+              rowHeight={ROW_HEIGHT}
+            />
           </div>
           <div
             className={`${mobilePane === "b" ? "block" : "hidden"} min-w-0 flex-1 basis-0 overflow-hidden md:block`}

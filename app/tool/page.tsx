@@ -712,7 +712,7 @@ const buttonPrimary =
                   className={ctaButton}
                   onClick={() => void sortAndCompare({ reorderArrays })}
                   type="button"
-                  disabled={!bothHaveContent || isProcessing}
+                  disabled={Boolean(!bothHaveContent || isProcessing)}
                   aria-label="Align and compare the two JSON configurations"
                 >
                   {bothHaveContent && <span aria-hidden="true" className="text-cyan-300">✓</span>}
@@ -747,7 +747,7 @@ const buttonPrimary =
 
       {isResultsOnly && (
         <div className="w-full">
-          <section id="results" ref={resultSectionRef} className="mt-2 px-0 sm:mt-4 sm:px-2 lg:px-10">
+          <section id="results" ref={resultSectionRef} className="mt-2 px-0 sm:mt-4 sm:px-2 lg:px-2">
             <OutputSection
               panelClass={panelClass}
               inputClass={inputClass}
