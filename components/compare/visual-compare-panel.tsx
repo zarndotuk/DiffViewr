@@ -164,6 +164,7 @@ type ActiveDiffKind = Exclude<DiffKind, "same">;
 const ROW_HEIGHT = 27;
 const VIRTUAL_OVERSCAN = 24;
 const TRAILING_EDITOR_LINES = 1;
+const JSON_VIEW_VERTICAL_PADDING = 20;
 
 function diffKindPriority(kind?: DiffKind) {
   switch (kind) {
@@ -643,8 +644,14 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
   }, [aligned]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const contentLayerRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(640);
+  const [contentMetrics, setContentMetrics] = useState({
+    contentScrollHeight: ROW_HEIGHT,
+    contentOffsetTop: 0,
+    rowHeight: ROW_HEIGHT
+  });
 
   const inferAForLine = useCallback(
     (line: LinePair) =>
@@ -771,12 +778,61 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     return () => observer.disconnect();
   }, []);
 
+  const editorContentHeight = (visibleLineIndices.length + TRAILING_EDITOR_LINES) * ROW_HEIGHT;
+  const editorOuterHeight = editorContentHeight + JSON_VIEW_VERTICAL_PADDING;
+  const contentScrollTop = Math.max(0, scrollTop - contentMetrics.contentOffsetTop);
+  const viewportContentTop = Math.min(
+    contentMetrics.contentScrollHeight,
+    contentScrollTop
+  );
+  const viewportContentBottom = Math.min(
+    contentMetrics.contentScrollHeight,
+    Math.max(0, scrollTop + viewportHeight - contentMetrics.contentOffsetTop)
+  );
+  const viewportContentHeight = Math.max(0, viewportContentBottom - viewportContentTop);
+
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+    const contentElement = contentLayerRef.current;
+    if (!scrollElement || !contentElement) return;
+
+    const updateMetrics = () => {
+      const scrollRect = scrollElement.getBoundingClientRect();
+      const contentRect = contentElement.getBoundingClientRect();
+      const rowElement = contentElement.querySelector<HTMLElement>("[data-line-row='true']");
+      const measuredRowHeight = rowElement?.getBoundingClientRect().height || ROW_HEIGHT;
+      const nextMetrics = {
+        contentScrollHeight: contentElement.scrollHeight || contentRect.height || editorContentHeight,
+        contentOffsetTop: scrollElement.scrollTop + contentRect.top - scrollRect.top,
+        rowHeight: measuredRowHeight
+      };
+
+      setContentMetrics((current) =>
+        current.contentScrollHeight === nextMetrics.contentScrollHeight &&
+        current.contentOffsetTop === nextMetrics.contentOffsetTop &&
+        current.rowHeight === nextMetrics.rowHeight
+          ? current
+          : nextMetrics
+      );
+    };
+
+    updateMetrics();
+    const observer = new ResizeObserver(updateMetrics);
+    observer.observe(scrollElement);
+    observer.observe(contentElement);
+    window.addEventListener("resize", updateMetrics);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateMetrics);
+    };
+  }, [editorContentHeight, visibleLineIndices.length]);
+
   const virtualWindow = useMemo(() => {
     const start = Math.max(
       0,
-      Math.floor(scrollTop / ROW_HEIGHT) - VIRTUAL_OVERSCAN
+      Math.floor(contentScrollTop / contentMetrics.rowHeight) - VIRTUAL_OVERSCAN
     );
-    const visibleCount = Math.ceil(viewportHeight / ROW_HEIGHT);
+    const visibleCount = Math.ceil(viewportHeight / contentMetrics.rowHeight);
     const end = Math.min(
       visibleLineIndices.length,
       start + visibleCount + VIRTUAL_OVERSCAN * 2
@@ -787,9 +843,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
         lineIndex,
         visiblePosition: start + offset
       }));
-  }, [scrollTop, viewportHeight, visibleLineIndices]);
-
-  const editorHeight = (visibleLineIndices.length + TRAILING_EDITOR_LINES) * ROW_HEIGHT;
+  }, [contentMetrics.rowHeight, contentScrollTop, viewportHeight, visibleLineIndices]);
 
   const goToChange = useCallback((pos: number) => {
     if (pos < 0 || pos >= changeLineIndices.length) return;
@@ -801,14 +855,15 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
       scrollRef.current.scrollTo({
         top: Math.max(
           0,
-          visiblePosition * ROW_HEIGHT -
+          contentMetrics.contentOffsetTop +
+            visiblePosition * contentMetrics.rowHeight -
             scrollRef.current.clientHeight / 2 +
-            ROW_HEIGHT / 2
+            contentMetrics.rowHeight / 2
         ),
         behavior: "smooth"
       });
     }
-  }, [changeLineIndices, visibleLineIndices]);
+  }, [changeLineIndices, contentMetrics.contentOffsetTop, contentMetrics.rowHeight, visibleLineIndices]);
 
   const scrollToLine = useCallback((lineIndex: number) => {
     if (lineIndex < 0 || lineIndex >= aligned.length) return;
@@ -817,14 +872,15 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
       scrollRef.current.scrollTo({
         top: Math.max(
           0,
-          visiblePosition * ROW_HEIGHT -
+          contentMetrics.contentOffsetTop +
+            visiblePosition * contentMetrics.rowHeight -
             scrollRef.current.clientHeight / 2 +
-            ROW_HEIGHT / 2
+            contentMetrics.rowHeight / 2
         ),
         behavior: "smooth"
       });
     }
-  }, [aligned.length, visibleLineIndices]);
+  }, [aligned.length, contentMetrics.contentOffsetTop, contentMetrics.rowHeight, visibleLineIndices]);
 
   function renderTokenLine(tokens: ShikiTokenLine | undefined, fallbackText: string) {
     if (!tokens) return <span className="json-code whitespace-pre">{fallbackText}</span>;
@@ -888,62 +944,68 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
               </div>
               <div
                 className="json-view relative w-full"
-                style={{ height: editorHeight }}
+                style={{ height: editorOuterHeight }}
               >
-                {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
-                  const line = aligned[idx];
-                  const inferred = line.aStatus
-                    ? line.aStatus
-                    : line.aPath
-                      ? aMap.get(line.aPath)
-                      : undefined;
-                  const isActive = activeLine === idx;
-                  return (
-                    <div
-                      key={`a-${idx}`}
-                      className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
-                      style={{
-                        height: ROW_HEIGHT,
-                        transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
-                      }}
-                    >
-                      {isActive && (
-                        <svg
-                          className="absolute left-1 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-400"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                          aria-hidden="true"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      )}
-                      <span className="json-lineno" aria-hidden="true">
-                        {idx + 1}
-                      </span>
-                      {renderTokenLine(aTokens?.[idx], line.aText)}
-                    </div>
-                  );
-                })}
                 <div
-                  className="json-line same json-editor-line absolute left-0 right-0"
-                  style={{
-                    height: ROW_HEIGHT,
-                    transform: `translateY(${visibleLineIndices.length * ROW_HEIGHT}px)`
-                  }}
-                  aria-hidden="true"
+                  ref={contentLayerRef}
+                  className="relative w-full"
+                  style={{ height: editorContentHeight }}
                 >
-                  <span className="json-lineno">&nbsp;</span>
-                  <span className="json-code whitespace-pre">&nbsp;</span>
+                  {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
+                    const line = aligned[idx];
+                    const inferred = line.aStatus
+                      ? line.aStatus
+                      : line.aPath
+                        ? aMap.get(line.aPath)
+                        : undefined;
+                    const isActive = activeLine === idx;
+                    return (
+                      <div
+                        key={`a-${idx}`}
+                        data-line-row="true"
+                        className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 top-0 ${isActive ? "json-line-active" : ""}`}
+                        style={{
+                          height: ROW_HEIGHT,
+                          transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
+                        }}
+                      >
+                        {isActive && (
+                          <svg
+                            className="absolute left-1 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-400"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                            aria-hidden="true"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        )}
+                        <span className="json-lineno" aria-hidden="true">
+                          {idx + 1}
+                        </span>
+                        {renderTokenLine(aTokens?.[idx], line.aText)}
+                      </div>
+                    );
+                  })}
+                  <div
+                    className="json-line same json-editor-line absolute left-0 right-0 top-0"
+                    style={{
+                      height: ROW_HEIGHT,
+                      transform: `translateY(${visibleLineIndices.length * ROW_HEIGHT}px)`
+                    }}
+                    aria-hidden="true"
+                  >
+                    <span className="json-lineno">&nbsp;</span>
+                    <span className="json-code whitespace-pre">&nbsp;</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          <div className="hidden md:block">
-            <div className="px-3 py-5" />
+          <div className="hidden self-start md:block">
             <MiniMap
               visibleLineIndices={visibleLineIndices}
               changeLineIndices={changeLineIndices}
@@ -951,10 +1013,11 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
               inferBetweenKind={inferBetweenKind}
               activeFilterSet={activeFilterSet}
               onScrollToLine={scrollToLine}
-              scrollTop={scrollTop}
-              viewportHeight={viewportHeight}
-              totalHeight={editorHeight}
-              rowHeight={ROW_HEIGHT}
+              contentScrollHeight={contentMetrics.contentScrollHeight}
+              contentTopOffset={Math.max(0, contentMetrics.contentOffsetTop - 1)}
+              viewportContentTop={viewportContentTop}
+              viewportContentHeight={viewportContentHeight}
+              rowHeight={contentMetrics.rowHeight}
             />
           </div>
           <div
@@ -966,56 +1029,62 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
               </div>
               <div
                 className="json-view relative w-full"
-                style={{ height: editorHeight }}
+                style={{ height: editorOuterHeight }}
               >
-                {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
-                  const line = aligned[idx];
-                  const inferred = line.bStatus
-                    ? line.bStatus
-                    : line.bPath
-                      ? bMap.get(line.bPath)
-                      : undefined;
-                  const isActive = activeLine === idx;
-                  return (
-                    <div
-                      key={`b-${idx}`}
-                      className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 ${isActive ? "json-line-active" : ""}`}
-                      style={{
-                        height: ROW_HEIGHT,
-                        transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
-                      }}
-                    >
-                      {isActive && (
-                        <svg
-                          className="absolute left-1 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-400"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                          aria-hidden="true"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      )}
-                      <span className="json-lineno" aria-hidden="true">
-                        {idx + 1}
-                      </span>
-                      {renderTokenLine(bTokens?.[idx], line.bText)}
-                    </div>
-                  );
-                })}
                 <div
-                  className="json-line same json-editor-line absolute left-0 right-0"
-                  style={{
-                    height: ROW_HEIGHT,
-                    transform: `translateY(${visibleLineIndices.length * ROW_HEIGHT}px)`
-                  }}
-                  aria-hidden="true"
+                  className="relative w-full"
+                  style={{ height: editorContentHeight }}
                 >
-                  <span className="json-lineno">&nbsp;</span>
-                  <span className="json-code whitespace-pre">&nbsp;</span>
+                  {virtualWindow.map(({ lineIndex: idx, visiblePosition }) => {
+                    const line = aligned[idx];
+                    const inferred = line.bStatus
+                      ? line.bStatus
+                      : line.bPath
+                        ? bMap.get(line.bPath)
+                        : undefined;
+                    const isActive = activeLine === idx;
+                    return (
+                      <div
+                        key={`b-${idx}`}
+                        data-line-row="true"
+                        className={`${kindClass(inferred)} json-editor-line absolute left-0 right-0 top-0 ${isActive ? "json-line-active" : ""}`}
+                        style={{
+                          height: ROW_HEIGHT,
+                          transform: `translateY(${visiblePosition * ROW_HEIGHT}px)`
+                        }}
+                      >
+                        {isActive && (
+                          <svg
+                            className="absolute left-1 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-400"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                            aria-hidden="true"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        )}
+                        <span className="json-lineno" aria-hidden="true">
+                          {idx + 1}
+                        </span>
+                        {renderTokenLine(bTokens?.[idx], line.bText)}
+                      </div>
+                    );
+                  })}
+                  <div
+                    className="json-line same json-editor-line absolute left-0 right-0 top-0"
+                    style={{
+                      height: ROW_HEIGHT,
+                      transform: `translateY(${visibleLineIndices.length * ROW_HEIGHT}px)`
+                    }}
+                    aria-hidden="true"
+                  >
+                    <span className="json-lineno">&nbsp;</span>
+                    <span className="json-code whitespace-pre">&nbsp;</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1024,7 +1093,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
         </div>
 
        {changeLineIndices.length > 0 && (
-         <div className="mobile-change-nav absolute bottom-3 left-1/2 z-30 flex w-[calc(100%_-_2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[var(--panel)] px-0.5 py-1 shadow-[0_4px_12px_rgba(0,0,0,0.28)] sm:bottom-6 sm:w-fit sm:max-w-none">
+         <div className="mobile-change-nav absolute bottom-3 right-3 z-30 flex w-[calc(100%_-_2rem)] max-w-sm items-center justify-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[var(--panel)]/50 px-0.5 py-1 shadow-[0_4px_12px_rgba(0,0,0,0.14)] sm:bottom-6 sm:right-6 sm:w-fit sm:max-w-none">
            <button
              type="button"
              className="flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[12px] text-[var(--muted)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--text)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
@@ -1034,7 +1103,7 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
            >
              ← Prev
            </button>
-           <span className="font-mono text-[12px] text-[var(--muted)] px-2 border-x border-[var(--border)]">
+           <span className="font-mono text-[12px] text-[var(--muted)] px-2">
              {activeChangePos + 1} / {changeLineIndices.length}
            </span>
            <button

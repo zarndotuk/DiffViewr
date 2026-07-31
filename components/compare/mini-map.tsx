@@ -19,9 +19,10 @@ type MiniMapProps = {
   inferBetweenKind: (line: LinePair) => DiffKind | undefined;
   activeFilterSet: Set<DiffKind>;
   onScrollToLine: (lineIndex: number) => void;
-  scrollTop: number;
-  viewportHeight: number;
-  totalHeight: number;
+  contentScrollHeight: number;
+  contentTopOffset: number;
+  viewportContentTop: number;
+  viewportContentHeight: number;
   rowHeight: number;
 };
 
@@ -32,37 +33,63 @@ export function MiniMap({
   inferBetweenKind,
   activeFilterSet,
   onScrollToLine,
-  scrollTop,
-  viewportHeight,
-  totalHeight,
+  contentScrollHeight,
+  contentTopOffset,
+  viewportContentTop,
+  viewportContentHeight,
   rowHeight
 }: MiniMapProps) {
+  const clampPercent = (value: number) => Math.min(100, Math.max(0, value));
+  const safeContentHeight = Math.max(1, contentScrollHeight);
+
   const segments = useMemo(() => {
     const result: Array<{ kind: DiffKind | "same" | "hidden"; position: number }> = [];
-    for (let i = 0; i < aligned.length; i += 1) {
-      const kind = inferBetweenKind(aligned[i]);
-      const isVisible = !kind || kind === "same" || activeFilterSet.has(kind as DiffKind);
-      if (isVisible) {
-        const position = (i * rowHeight / totalHeight) * 100;
-        if (kind && kind !== "same") {
-          result.push({ kind, position });
-        }
+    const visiblePositions = new Map(
+      visibleLineIndices.map((lineIndex, visiblePosition) => [lineIndex, visiblePosition])
+    );
+
+    for (const lineIndex of changeLineIndices) {
+      const visiblePosition = visiblePositions.get(lineIndex);
+      if (visiblePosition === undefined) continue;
+
+      const kind = inferBetweenKind(aligned[lineIndex]);
+      if (kind && kind !== "same" && activeFilterSet.has(kind as DiffKind)) {
+        result.push({
+          kind,
+          position: clampPercent((visiblePosition * rowHeight / safeContentHeight) * 100)
+        });
       }
     }
     return result;
-  }, [aligned, inferBetweenKind, activeFilterSet, rowHeight, totalHeight]);
+  }, [
+    activeFilterSet,
+    aligned,
+    changeLineIndices,
+    inferBetweenKind,
+    rowHeight,
+    safeContentHeight,
+    visibleLineIndices
+  ]);
 
   const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const clickY = event.clientY - rect.top;
-    const scrollRatio = clickY / rect.height;
-    const targetScrollTop = scrollRatio * totalHeight;
-    const targetLineIndex = Math.floor(targetScrollTop / rowHeight);
-    onScrollToLine(targetLineIndex);
+    const scrollRatio = rect.height > 0 ? clickY / rect.height : 0;
+    const targetContentOffset = scrollRatio * safeContentHeight;
+    const targetVisiblePosition = Math.min(
+      visibleLineIndices.length - 1,
+      Math.max(0, Math.floor(targetContentOffset / rowHeight))
+    );
+    const targetLineIndex = visibleLineIndices[targetVisiblePosition];
+    if (targetLineIndex !== undefined) onScrollToLine(targetLineIndex);
   };
 
-  const viewportIndicatorTop = (scrollTop / totalHeight) * 100;
-  const viewportIndicatorHeight = (viewportHeight / totalHeight) * 100;
+  const viewportIndicatorTop = clampPercent((viewportContentTop / safeContentHeight) * 100);
+  const viewportIndicatorHeight = Math.min(
+    100 - viewportIndicatorTop,
+    clampPercent((viewportContentHeight / safeContentHeight) * 100)
+  );
+  const markerHeight = clampPercent((rowHeight / safeContentHeight) * 100);
 
   const getSegmentColor = (kind: DiffKind | "same" | "hidden") => {
     switch (kind) {
@@ -85,8 +112,8 @@ export function MiniMap({
 
   return (
     <div
-      className="relative flex-shrink-0 w-[20px] border-l border-r border-[var(--border)] cursor-pointer overflow-hidden"
-      style={{ height: totalHeight }}
+      className="sticky top-[40px] flex-shrink-0 w-[20px] border-l border-r border-[var(--border)] cursor-pointer overflow-hidden"
+      style={{ height: safeContentHeight, marginTop: contentTopOffset }}
       onClick={handleClick}
       role="button"
       aria-label="Mini-map: click to scroll to position"
@@ -96,7 +123,7 @@ export function MiniMap({
         <div
           key={index}
           className={`absolute left-0 right-0 ${getSegmentColor(segment.kind)}`}
-          style={{ top: `${segment.position}%`, height: `${(rowHeight / totalHeight) * 100}%` }}
+          style={{ top: `${segment.position}%`, height: `${markerHeight}%` }}
         />
       ))}
       <div

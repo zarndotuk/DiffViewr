@@ -622,7 +622,6 @@ input {
   height: auto;
   max-height: none;
   overflow: visible;
-  padding: 10px 12px;
   background: color-mix(in srgb, var(--panel) 80%, transparent);
 }
 
