@@ -66,6 +66,12 @@ type LinePair = {
   bStatus?: DiffKind;
 };
 
+type SearchMatch = {
+  lineIndex: number;
+  matchesA: boolean;
+  matchesB: boolean;
+};
+
 type RenderLine = {
   text: string;
   path?: string;
@@ -645,6 +651,8 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const contentLayerRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchReturnFocusRef = useRef<HTMLElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(640);
   const [contentMetrics, setContentMetrics] = useState({
@@ -715,6 +723,9 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
 
   const [activeChangePos, setActiveChangePos] = useState(0);
   const [activeLine, setActiveLine] = useState<number | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeSearchPos, setActiveSearchPos] = useState(0);
   const [activeFilters, setActiveFilters] = useState<ActiveDiffKind[]>([
     "missing",
     "extra",
@@ -746,6 +757,24 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     }
     return out;
   }, [aligned, isVisibleLine]);
+  const visibleLineIndexSet = useMemo(() => new Set(visibleLineIndices), [visibleLineIndices]);
+  const searchMatches = useMemo(() => {
+    const query = searchQuery.toLocaleLowerCase();
+    if (!query) return [];
+
+    const matches: SearchMatch[] = [];
+    for (let lineIndex = 0; lineIndex < aligned.length; lineIndex += 1) {
+      const line = aligned[lineIndex];
+      const matchesA = line.aText.toLocaleLowerCase().includes(query);
+      const matchesB = line.bText.toLocaleLowerCase().includes(query);
+      if (matchesA || matchesB) matches.push({ lineIndex, matchesA, matchesB });
+    }
+    return matches;
+  }, [aligned, searchQuery]);
+  const visibleSearchMatches = useMemo(
+    () => searchMatches.filter((match) => visibleLineIndexSet.has(match.lineIndex)),
+    [searchMatches, visibleLineIndexSet]
+  );
 
   const changeLineIndices = useMemo(() => {
     const out: number[] = [];
@@ -882,6 +911,70 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
     }
   }, [aligned.length, contentMetrics.contentOffsetTop, contentMetrics.rowHeight, visibleLineIndices]);
 
+  const navigateToSearchMatch = useCallback((position: number) => {
+    if (visibleSearchMatches.length === 0) return;
+    const wrappedPosition =
+      ((position % visibleSearchMatches.length) + visibleSearchMatches.length) %
+      visibleSearchMatches.length;
+    const match = visibleSearchMatches[wrappedPosition];
+
+    setActiveSearchPos(wrappedPosition);
+    setActiveLine(match.lineIndex);
+    setMobilePane((current) => {
+      if ((current === "a" && match.matchesA) || (current === "b" && match.matchesB)) return current;
+      return match.matchesA ? "a" : "b";
+    });
+    scrollToLine(match.lineIndex);
+  }, [scrollToLine, visibleSearchMatches]);
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    requestAnimationFrame(() => searchReturnFocusRef.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const frame = requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [searchOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "f") {
+        event.preventDefault();
+        if (!searchOpen && document.activeElement instanceof HTMLElement) {
+          searchReturnFocusRef.current = document.activeElement;
+        }
+        setSearchOpen(true);
+        requestAnimationFrame(() => {
+          searchInputRef.current?.focus();
+          searchInputRef.current?.select();
+        });
+        return;
+      }
+      if (searchOpen && event.key === "Escape") {
+        event.preventDefault();
+        closeSearch();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [closeSearch, searchOpen]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    if (!searchQuery || visibleSearchMatches.length === 0) {
+      setActiveSearchPos(0);
+      setActiveLine(null);
+      return;
+    }
+    navigateToSearchMatch(0);
+  }, [navigateToSearchMatch, searchOpen, searchQuery, visibleSearchMatches.length]);
+
   function renderTokenLine(tokens: ShikiTokenLine | undefined, fallbackText: string) {
     if (!tokens) return <span className="json-code whitespace-pre">{fallbackText}</span>;
     return (
@@ -902,6 +995,77 @@ export function VisualComparePanel({ result }: { result: CompareResult }) {
         activeFilters={activeFilterSet}
         onToggleFilter={toggleFilter}
       />
+      {searchOpen ? (
+        <section
+          className="fixed right-3 top-3 z-50 w-[calc(100%_-_1.5rem)] max-w-md rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:right-6 sm:top-6"
+          role="dialog"
+          aria-labelledby="compare-search-title"
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 id="compare-search-title" className="font-mono text-[12px] font-medium text-[var(--text)]">
+              Find in visual compare
+            </h2>
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-lg leading-none text-[var(--muted)] transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={closeSearch}
+              aria-label="Close search"
+            >
+              ×
+            </button>
+          </div>
+          <label className="sr-only" htmlFor="compare-search-input">
+            Search keyword
+          </label>
+          <input
+            ref={searchInputRef}
+            id="compare-search-input"
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              navigateToSearchMatch(activeSearchPos + (event.shiftKey ? -1 : 1));
+            }}
+            className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--panel2)] px-3 font-mono text-[13px] text-[var(--text)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--accent)_24%,transparent)]"
+            placeholder="Search A and B"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <p className="min-w-0 font-mono text-[11px] text-[var(--muted)]" role="status" aria-live="polite">
+              {!searchQuery
+                ? "Type to search both files"
+                : searchMatches.length === 0
+                  ? "No matches"
+                  : visibleSearchMatches.length === 0
+                    ? `0 visible / ${searchMatches.length} matches`
+                    : searchMatches.length === visibleSearchMatches.length
+                      ? `${activeSearchPos + 1} / ${visibleSearchMatches.length} matches`
+                      : `${activeSearchPos + 1} / ${visibleSearchMatches.length} visible · ${searchMatches.length} total`}
+            </p>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                className="min-h-9 rounded-md px-2.5 font-mono text-[11px] text-[var(--muted)] transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-30"
+                onClick={() => navigateToSearchMatch(activeSearchPos - 1)}
+                disabled={visibleSearchMatches.length === 0}
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                className="min-h-9 rounded-md px-2.5 font-mono text-[11px] font-medium text-[var(--text)] transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-30"
+                onClick={() => navigateToSearchMatch(activeSearchPos + 1)}
+                disabled={visibleSearchMatches.length === 0}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
       <div className="grid grid-cols-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1 md:hidden">
         <button
           type="button"
